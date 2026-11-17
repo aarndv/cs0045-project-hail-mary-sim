@@ -49,9 +49,11 @@ constexpr double adrianScale = 1.2; // 60% of Adrian's previous diameter.
 constexpr double adrianDropFraction = 0.10; // Fraction of its displayed diameter.
 constexpr double shipMoveSpeed = 0.30;
 Vec3 camera = initialCamera;
+Vec3 particleAnchor = initialCamera;
 double moveSpeed = shipMoveSpeed;
 double cameraYaw = 0.0;
 double cameraPitch = 0.0;
+double particleYaw = 0.0, particlePitch = 0.0;
 std::array<bool, 256> keys{};
 int lastFrameTime = 0;
 int windowWidth = 900, windowHeight = 700;
@@ -71,7 +73,7 @@ struct Particle {
     Vec3 position;
     float phase = 0.0f, threshold = 0.0f, tint = 1.0f;
 };
-std::array<Particle, 9000> particles{};
+std::array<Particle, 18000> particles{};
 
 Vec3 adrianSceneCenter() {
     const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
@@ -146,6 +148,9 @@ void loadCameraPath() {
     pathDistance = std::sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
     pathPosition = 0.0;
     applyPathPosition();
+    particleAnchor = camera;
+    particleYaw = cameraYaw;
+    particlePitch = cameraPitch;
     hudStatus = "At pos1. Hold W to move toward pos2.";
 }
 
@@ -156,12 +161,13 @@ void initializeParticles() {
     for (std::size_t i = 0; i < particles.size(); ++i) {
         Particle& particle = particles[i];
         const double angle = unit(random) * 6.283185307179586;
-        // One quarter of the field is concentrated near the center; the rest
-        // spans a larger circle that reaches both sides of the view.
-        const double radius = std::sqrt(unit(random)) * (i % 4 == 0 ? 0.58 : 1.28);
+        // The outer volume extends beyond the camera's view at both endpoints.
+        const double fieldRadius = i % 10 == 0 ? 0.70 : (i % 10 < 5 ? 1.50 : 2.45);
+        const double radius = std::sqrt(unit(random)) * fieldRadius;
         particle.position = {std::cos(angle) * radius,
                              std::sin(angle) * radius,
-                             0.40 + unit(random) * 2.10};
+                             i % 31 == 0 ? 0.08 + unit(random) * 0.20 :
+                                          0.35 + unit(random) * 3.30};
         particle.phase = static_cast<float>(unit(random) * 6.283185307179586);
         particle.threshold = static_cast<float>(unit(random));
         particle.tint = static_cast<float>(0.65 + unit(random) * 0.35);
@@ -176,6 +182,9 @@ void startAnimation() {
     }
     pathPosition = 0.0;
     applyPathPosition();
+    particleAnchor = camera;
+    particleYaw = cameraYaw;
+    particlePitch = cameraPitch;
     animating = true;
     keys.fill(false);
     hudStatus = "Playing pos1 -> pos2. W/S takes manual control.";
@@ -259,25 +268,21 @@ Vec3 animatedParticlePosition(const Particle& particle, const Vec3& forward,
     const double depth = particle.position.z;
     const double x = (particle.position.x + 0.018 * std::sin(phase)) * depth * tanHalfFov;
     const double y = (particle.position.y + 0.018 * std::cos(phase * 1.2)) * depth * tanHalfFov;
-    return {camera.x + forward.x * depth + right.x * x + up.x * y,
-            camera.y + forward.y * depth + right.y * x + up.y * y,
-            camera.z + forward.z * depth + right.z * x + up.z * y};
+    return {particleAnchor.x + forward.x * depth + right.x * x + up.x * y,
+            particleAnchor.y + forward.y * depth + right.y * x + up.y * y,
+            particleAnchor.z + forward.z * depth + right.z * x + up.z * y};
 }
 
 void drawParticleDisk(const Vec3& position, const Vec3& right, const Vec3& up,
-                      double radius, const Vec3& centerColor, const Vec3& edgeColor,
-                      float tint) {
+                      double radius, const Vec3& color, float tint) {
     constexpr double twoPi = 6.283185307179586;
-    // Vertex colors suggest a bright core using only the guide's triangle fans.
     glBegin(GL_TRIANGLE_FAN);
-    glColor3f(static_cast<GLfloat>(centerColor.x * tint),
-              static_cast<GLfloat>(centerColor.y * tint),
-              static_cast<GLfloat>(centerColor.z * tint));
+    glColor4f(static_cast<GLfloat>(color.x * tint), static_cast<GLfloat>(color.y * tint),
+              static_cast<GLfloat>(color.z * tint), 0.58f);
     glVertex3f(static_cast<GLfloat>(position.x), static_cast<GLfloat>(position.y),
                static_cast<GLfloat>(position.z));
-    glColor3f(static_cast<GLfloat>(edgeColor.x * tint),
-              static_cast<GLfloat>(edgeColor.y * tint),
-              static_cast<GLfloat>(edgeColor.z * tint));
+    glColor4f(static_cast<GLfloat>(color.x * tint), static_cast<GLfloat>(color.y * tint),
+              static_cast<GLfloat>(color.z * tint), 0.0f);
     for (int corner = 0; corner <= 8; ++corner) {
         const double angle = twoPi * corner / 8.0;
         const double horizontal = radius * std::cos(angle);
@@ -292,29 +297,52 @@ void drawParticleDisk(const Vec3& position, const Vec3& right, const Vec3& up,
 void drawParticles() {
     if (!pathReady || pathPosition <= 0.40) return;
     const double density = std::min(1.0, (pathPosition - 0.40) / 0.60);
-    const Vec3 forward = forwardDirection();
-    const Vec3 right{std::cos(cameraYaw), 0.0, std::sin(cameraYaw)};
+    const Vec3 viewForward = forwardDirection();
+    const Vec3 viewRight{std::cos(cameraYaw), 0.0, std::sin(cameraYaw)};
+    const Vec3 viewUp{viewRight.y * viewForward.z - viewRight.z * viewForward.y,
+                      viewRight.z * viewForward.x - viewRight.x * viewForward.z,
+                      viewRight.x * viewForward.y - viewRight.y * viewForward.x};
+    const Vec3 forward{std::sin(particleYaw) * std::cos(particlePitch),
+                       std::sin(particlePitch),
+                       -std::cos(particleYaw) * std::cos(particlePitch)};
+    const Vec3 right{std::cos(particleYaw), 0.0, std::sin(particleYaw)};
     const Vec3 up{right.y * forward.z - right.z * forward.y,
                   right.z * forward.x - right.x * forward.z,
                   right.x * forward.y - right.y * forward.x};
     glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    glDepthMask(GL_FALSE);
     for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
         const Particle& particle = particles[i];
         if (particle.threshold > density) continue;
         const Vec3 position = animatedParticlePosition(particle, forward, right, up);
         const Vec3 offset{position.x - camera.x, position.y - camera.y,
                           position.z - camera.z};
-        const double depth = offset.x * forward.x + offset.y * forward.y + offset.z * forward.z;
+        const double depth = offset.x * viewForward.x + offset.y * viewForward.y +
+                             offset.z * viewForward.z;
         if (depth <= 0.06) continue;
+        const double screenX = (offset.x * viewRight.x + offset.y * viewRight.y +
+                                offset.z * viewRight.z) / (depth * 0.414213562373095);
+        const double screenY = (offset.x * viewUp.x + offset.y * viewUp.y +
+                                offset.z * viewUp.z) / (depth * 0.414213562373095);
+        if (std::abs(screenX) > static_cast<double>(windowWidth) / windowHeight + 0.1 ||
+            std::abs(screenY) > 1.1) continue;
+        const double wing = (screenY + 0.55) / 0.17;
+        const double shipWidth = 0.26 + 0.28 * std::max(0.0, -screenY) +
+                                 0.35 * std::exp(-wing * wing);
+        const double shipFade = std::clamp(std::min((0.10 - screenY) / 0.12,
+            (shipWidth - std::abs(screenX)) / 0.10), 0.0, 1.0);
+        if (depth < 2.6 && (shipFade > 0.65 || particle.threshold < shipFade)) continue;
         const double pixelScale = 0.828427124746 * depth / windowHeight;
-        const double pixels = i < 6300 ? 2.7 : (i < 8580 ? 4.5 : 7.0);
-        const Vec3 centerColor = i < 6300 ? Vec3{1.0, 0.44, 0.60} :
-                                 (i < 8580 ? Vec3{1.0, 0.72, 0.82} : Vec3{1.0, 0.90, 0.94});
-        const Vec3 edgeColor = i < 6300 ? Vec3{0.72, 0.12, 0.32} :
-                               (i < 8580 ? Vec3{0.88, 0.23, 0.48} : Vec3{0.96, 0.38, 0.62});
-        drawParticleDisk(position, right, up, pixels * pixelScale,
-                         centerColor, edgeColor, particle.tint);
+        const double pixels = (i < 12600 ? 4.5 : (i < 17160 ? 8.0 : 14.0)) *
+                              std::min(2.0, 0.7 + 0.45 / depth);
+        const Vec3 color = i < 12600 ? Vec3{0.75, 0.08, 0.28} :
+                           (i < 17160 ? Vec3{1.0, 0.28, 0.52} : Vec3{1.0, 0.70, 0.82});
+        drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale, color, particle.tint);
     }
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
     glEnable(GL_LIGHTING);
 }
 
@@ -436,6 +464,23 @@ void timer(int) {
                 hudStatus = endpoint;
                 glutPostRedisplay();
             }
+        }
+    }
+    if (pathReady) {
+        const double follow = 1.0 - std::exp(-5.0 * seconds);
+        const double dx = camera.x - particleAnchor.x;
+        const double dy = camera.y - particleAnchor.y;
+        const double dz = camera.z - particleAnchor.z;
+        const double yawDelta = std::remainder(cameraYaw - particleYaw, 6.283185307179586);
+        const double pitchDelta = cameraPitch - particlePitch;
+        if (std::abs(dx) + std::abs(dy) + std::abs(dz) +
+            std::abs(yawDelta) + std::abs(pitchDelta) > 0.00001) {
+            particleAnchor.x += follow * dx;
+            particleAnchor.y += follow * dy;
+            particleAnchor.z += follow * dz;
+            particleYaw += follow * yawDelta;
+            particlePitch += follow * pitchDelta;
+            glutPostRedisplay();
         }
     }
     glutTimerFunc(16, timer, 0);
