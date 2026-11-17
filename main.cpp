@@ -358,7 +358,7 @@ void drawParticles() {
                                 offset.z * viewUp.z) / (depth * 0.414213562373095);
         if (std::abs(screenX) > static_cast<double>(windowWidth) / windowHeight + 0.25 ||
             std::abs(screenY) > 1.25) continue;
-        if (screenX * screenX + screenY * screenY < 0.65 * 0.65 && i % 9 < 2) continue;
+        if (screenX * screenX + screenY * screenY < 0.65 * 0.65 && i % 13 < 5) continue;
         const double pixelScale = 0.828427124746 * depth / windowHeight;
         const int sizeClass = i % 20;
         const double pixels = (sizeClass < 14 ? 4.5 : (sizeClass < 19 ? 8.0 : 14.0)) *
