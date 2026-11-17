@@ -172,6 +172,7 @@ void initializeParticles() {
         const double radius = std::sqrt(unit(random)) * fieldRadius;
         particle.position = {std::cos(angle) * radius,
                              std::sin(angle) * radius,
+                             i % 47 == 0 ? 0.065 + unit(random) * 0.065 :
                              i % 31 == 0 ? 0.08 + unit(random) * 0.20 :
                                           0.35 + unit(random) * 3.30};
         particle.phase = static_cast<float>(unit(random) * 6.283185307179586);
@@ -181,7 +182,7 @@ void initializeParticles() {
         particle.route = static_cast<float>(lateField ? 0.58 + unit(random) * 0.40 :
                                                       unit(random) * 0.90);
     }
-    // Screen-space neighbors stay nearly the same while this field follows the camera.
+    // Nearby projected particles share similar screen positions along the path.
     const auto cell = [](const Particle& p) {
         const int x = std::clamp(static_cast<int>((p.position.x + 2.45) * 32.0 / 4.90), 0, 31);
         const int y = std::clamp(static_cast<int>((p.position.y + 2.45) * 32.0 / 4.90), 0, 31);
@@ -317,6 +318,7 @@ void drawParticleDisk(const Vec3& position, const Vec3& right, const Vec3& up,
 void drawParticles() {
     if (!pathReady || pathPosition <= 0.40) return;
     const double density = std::min(1.0, (pathPosition - 0.40) / 0.60);
+    const double endFade = std::clamp((pathPosition - 0.75) / 0.25, 0.0, 1.0);
     const Vec3 viewForward = forwardDirection();
     const Vec3 viewRight{std::cos(cameraYaw), 0.0, std::sin(cameraYaw)};
     const Vec3 viewUp{viewRight.y * viewForward.z - viewRight.z * viewForward.y,
@@ -341,30 +343,28 @@ void drawParticles() {
                           position.z - camera.z};
         const double depth = offset.x * viewForward.x + offset.y * viewForward.y +
                              offset.z * viewForward.z;
-        if (depth <= 0.06) continue;
+        if (depth <= 0.055) continue;
+        const double farFade = std::clamp((depth - 1.2) / 2.5, 0.0, 1.0);
+        const double visibility = 1.0 - 0.90 * endFade * farFade;
+        if (particle.threshold > density * visibility) continue;
         const double screenX = (offset.x * viewRight.x + offset.y * viewRight.y +
                                 offset.z * viewRight.z) / (depth * 0.414213562373095);
         const double screenY = (offset.x * viewUp.x + offset.y * viewUp.y +
                                 offset.z * viewUp.z) / (depth * 0.414213562373095);
-        if (std::abs(screenX) > static_cast<double>(windowWidth) / windowHeight + 0.1 ||
-            std::abs(screenY) > 1.1) continue;
-        const double wing = (screenY + 0.55) / 0.17;
-        const double shipWidth = 0.26 + 0.28 * std::max(0.0, -screenY) +
-                                 0.35 * std::exp(-wing * wing);
-        const double shipFade = std::clamp(std::min((0.10 - screenY) / 0.12,
-            (shipWidth - std::abs(screenX)) / 0.10), 0.0, 1.0);
-        if (depth < 2.6 && (shipFade > 0.65 || particle.threshold < shipFade)) continue;
+        if (std::abs(screenX) > static_cast<double>(windowWidth) / windowHeight + 0.25 ||
+            std::abs(screenY) > 1.25) continue;
         const double pixelScale = 0.828427124746 * depth / windowHeight;
         const int sizeClass = i % 20;
         const double pixels = (sizeClass < 14 ? 4.5 : (sizeClass < 19 ? 8.0 : 14.0)) *
-                              std::min(particle.position.z < 0.30 ? 3.0 : 2.0,
+                              std::min(particle.position.z < 0.15 ? 4.0 :
+                                       particle.position.z < 0.30 ? 3.0 : 2.0,
                                        0.7 + 0.45 / depth);
         const Vec3 color = sizeClass < 14 ? Vec3{0.75, 0.08, 0.28} :
                            (sizeClass < 19 ? Vec3{1.0, 0.28, 0.52} : Vec3{1.0, 0.70, 0.82});
         const float tint = particle.tint * (1.0f + 0.25f * particle.crowding);
         drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale, color,
-                         tint, 0.50f + 0.35f * particle.crowding);
-        if (particle.position.z < 0.30 && particle.phase < 2.1f)
+                         tint, static_cast<float>((0.50f + 0.35f * particle.crowding) * visibility));
+        if (depth < 0.35 && particle.position.z < 0.30 && particle.phase < 2.1f)
             drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale * 0.22,
                              {1.0, 0.82, 0.90}, 1.0f, 0.95f, 0.95f);
     }
