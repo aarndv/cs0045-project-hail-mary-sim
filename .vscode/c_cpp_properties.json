@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "Linux GCC",
+            "compilerPath": "/usr/bin/g++",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/src/generated",
+                "${workspaceFolder}/third_party",
+                "/usr/include",
+                "/usr/include/GL"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
