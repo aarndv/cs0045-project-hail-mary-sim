@@ -70,9 +70,8 @@ double pathPosition = 0.0, pathDistance = 0.0;
 struct Particle {
     Vec3 position;
     float phase = 0.0f, threshold = 0.0f, tint = 1.0f;
-    bool followsCamera = false;
 };
-std::array<Particle, 6000> particles{};
+std::array<Particle, 9000> particles{};
 
 Vec3 adrianSceneCenter() {
     const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
@@ -154,42 +153,15 @@ void initializeParticles() {
     if (!pathReady) return;
     std::mt19937 random(2026);
     std::uniform_real_distribution<double> unit(0.0, 1.0);
-    const double yaw = animationStart.yaw, pitch = animationStart.pitch;
-    const Vec3 forward{std::sin(yaw) * std::cos(pitch), std::sin(pitch),
-                       -std::cos(yaw) * std::cos(pitch)};
-    const Vec3 right{std::cos(yaw), 0.0, std::sin(yaw)};
-    const Vec3 up{right.y * forward.z - right.z * forward.y,
-                  right.z * forward.x - right.x * forward.z,
-                  right.x * forward.y - right.y * forward.x};
     for (std::size_t i = 0; i < particles.size(); ++i) {
         Particle& particle = particles[i];
-        particle.followsCamera = i % 4 == 0;
-        if (particle.followsCamera) {
-            // A circular screen-space layer keeps the sides populated at pos2.
-            const bool fillsCenter = i % 12 == 0;
-            const double angle = fillsCenter ? unit(random) * 6.283185307179586 :
-                (unit(random) * 2.0 - 1.0) * 1.1;
-            const double side = fillsCenter || unit(random) < 0.5 ? -1.0 : 1.0;
-            const double radius = fillsCenter ? std::sqrt(unit(random)) * 0.98 :
-                0.66 + unit(random) * 0.32;
-            particle.position = {side * std::cos(angle) * radius,
-                                 std::sin(angle) * radius,
-                                 0.4 + unit(random) * 1.4};
-        } else {
-            const double route = unit(random);
-            const double depth = 0.45 + unit(random) * 3.5;
-            const double lateral = unit(random) * 2.0 - 1.0;
-            // Spread the field across the frame and favor its left and right edges.
-            const double side = std::copysign(std::sqrt(std::abs(lateral)), lateral) * depth * 0.52;
-            const double height = (unit(random) - 0.5) * depth * 0.85;
-            const Vec3 anchor{
-                animationStart.position.x + (animationEnd.position.x - animationStart.position.x) * route,
-                animationStart.position.y + (animationEnd.position.y - animationStart.position.y) * route,
-                animationStart.position.z + (animationEnd.position.z - animationStart.position.z) * route};
-            particle.position = {anchor.x + forward.x * depth + right.x * side + up.x * height,
-                                 anchor.y + forward.y * depth + right.y * side + up.y * height,
-                                 anchor.z + forward.z * depth + right.z * side + up.z * height};
-        }
+        const double angle = unit(random) * 6.283185307179586;
+        // One quarter of the field is concentrated near the center; the rest
+        // spans a larger circle that reaches both sides of the view.
+        const double radius = std::sqrt(unit(random)) * (i % 4 == 0 ? 0.58 : 1.28);
+        particle.position = {std::cos(angle) * radius,
+                             std::sin(angle) * radius,
+                             0.40 + unit(random) * 2.10};
         particle.phase = static_cast<float>(unit(random) * 6.283185307179586);
         particle.threshold = static_cast<float>(unit(random));
         particle.tint = static_cast<float>(0.65 + unit(random) * 0.35);
@@ -280,44 +252,34 @@ void drawHud() {
     glMatrixMode(GL_MODELVIEW);
 }
 
-Vec3 animatedParticlePosition(const Particle& particle) {
+Vec3 animatedParticlePosition(const Particle& particle, const Vec3& forward,
+                              const Vec3& right, const Vec3& up) {
     const double phase = particle.phase + pathPosition * 20.0;
-    if (particle.followsCamera) {
-        const Vec3 forward = forwardDirection();
-        const Vec3 right{std::cos(cameraYaw), 0.0, std::sin(cameraYaw)};
-        const Vec3 up{right.y * forward.z - right.z * forward.y,
-                      right.z * forward.x - right.x * forward.z,
-                      right.x * forward.y - right.y * forward.x};
-        constexpr double tanHalfFov = 0.414213562373095;
-        const double depth = particle.position.z;
-        const double x = (particle.position.x + 0.018 * std::sin(phase)) *
-                         depth * tanHalfFov;
-        const double y = (particle.position.y + 0.018 * std::cos(phase * 1.2)) *
-                         depth * tanHalfFov;
-        return {camera.x + forward.x * depth + right.x * x + up.x * y,
-                camera.y + forward.y * depth + right.y * x + up.y * y,
-                camera.z + forward.z * depth + right.z * x + up.z * y};
-    }
-    return {particle.position.x + 0.12 * std::sin(phase),
-            particle.position.y + 0.10 * std::cos(phase * 1.2),
-            particle.position.z + 0.08 * std::sin(phase * 0.8)};
+    constexpr double tanHalfFov = 0.414213562373095;
+    const double depth = particle.position.z;
+    const double x = (particle.position.x + 0.018 * std::sin(phase)) * depth * tanHalfFov;
+    const double y = (particle.position.y + 0.018 * std::cos(phase * 1.2)) * depth * tanHalfFov;
+    return {camera.x + forward.x * depth + right.x * x + up.x * y,
+            camera.y + forward.y * depth + right.y * x + up.y * y,
+            camera.z + forward.z * depth + right.z * x + up.z * y};
 }
 
-void drawGlowDisk(const Vec3& position, const Vec3& right, const Vec3& up,
-                  double radius, const Vec3& color, float tint, float opacity) {
+void drawParticleDisk(const Vec3& position, const Vec3& right, const Vec3& up,
+                      double radius, const Vec3& centerColor, const Vec3& edgeColor,
+                      float tint) {
     constexpr double twoPi = 6.283185307179586;
-    // Additive blending fades the rim into the scene without a dark outline.
+    // Vertex colors suggest a bright core using only the guide's triangle fans.
     glBegin(GL_TRIANGLE_FAN);
-    glColor4f(static_cast<GLfloat>(color.x * tint),
-              static_cast<GLfloat>(color.y * tint),
-              static_cast<GLfloat>(color.z * tint), opacity);
+    glColor3f(static_cast<GLfloat>(centerColor.x * tint),
+              static_cast<GLfloat>(centerColor.y * tint),
+              static_cast<GLfloat>(centerColor.z * tint));
     glVertex3f(static_cast<GLfloat>(position.x), static_cast<GLfloat>(position.y),
                static_cast<GLfloat>(position.z));
-    glColor4f(static_cast<GLfloat>(color.x * tint),
-              static_cast<GLfloat>(color.y * tint),
-              static_cast<GLfloat>(color.z * tint), 0.0f);
-    for (int corner = 0; corner <= 12; ++corner) {
-        const double angle = twoPi * corner / 12.0;
+    glColor3f(static_cast<GLfloat>(edgeColor.x * tint),
+              static_cast<GLfloat>(edgeColor.y * tint),
+              static_cast<GLfloat>(edgeColor.z * tint));
+    for (int corner = 0; corner <= 8; ++corner) {
+        const double angle = twoPi * corner / 8.0;
         const double horizontal = radius * std::cos(angle);
         const double vertical = radius * std::sin(angle);
         glVertex3f(static_cast<GLfloat>(position.x + right.x * horizontal + up.x * vertical),
@@ -336,33 +298,23 @@ void drawParticles() {
                   right.z * forward.x - right.x * forward.z,
                   right.x * forward.y - right.y * forward.x};
     glDisable(GL_LIGHTING);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    glDepthMask(GL_FALSE);
     for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
         const Particle& particle = particles[i];
         if (particle.threshold > density) continue;
-        const Vec3 position = animatedParticlePosition(particle);
+        const Vec3 position = animatedParticlePosition(particle, forward, right, up);
         const Vec3 offset{position.x - camera.x, position.y - camera.y,
                           position.z - camera.z};
         const double depth = offset.x * forward.x + offset.y * forward.y + offset.z * forward.z;
         if (depth <= 0.06) continue;
         const double pixelScale = 0.828427124746 * depth / windowHeight;
-        const Vec3 color = i < 4200 ? Vec3{0.70, 0.08, 0.25} :
-                           (i < 5720 ? Vec3{1.0, 0.22, 0.46} : Vec3{1.0, 0.58, 0.72});
-        if (i < 4200) {
-            drawGlowDisk(position, right, up, 5.0 * pixelScale, color, particle.tint, 0.55f);
-        } else {
-            const double haloPixels = i < 5720 ? 12.0 : 20.0;
-            const double corePixels = i < 5720 ? 3.5 : 5.0;
-            drawGlowDisk(position, right, up, haloPixels * pixelScale, color,
-                         particle.tint, 0.32f);
-            drawGlowDisk(position, right, up, corePixels * pixelScale, color,
-                         particle.tint, 0.86f);
-        }
+        const double pixels = i < 6300 ? 2.7 : (i < 8580 ? 4.5 : 7.0);
+        const Vec3 centerColor = i < 6300 ? Vec3{1.0, 0.44, 0.60} :
+                                 (i < 8580 ? Vec3{1.0, 0.72, 0.82} : Vec3{1.0, 0.90, 0.94});
+        const Vec3 edgeColor = i < 6300 ? Vec3{0.72, 0.12, 0.32} :
+                               (i < 8580 ? Vec3{0.88, 0.23, 0.48} : Vec3{0.96, 0.38, 0.62});
+        drawParticleDisk(position, right, up, pixels * pixelScale,
+                         centerColor, edgeColor, particle.tint);
     }
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
     glEnable(GL_LIGHTING);
 }
 
