@@ -71,7 +71,7 @@ struct Particle {
     Vec3 position;
     float phase = 0.0f, threshold = 0.0f, tint = 1.0f;
 };
-std::array<Particle, 1000> particles{};
+std::array<Particle, 1500> particles{};
 
 Vec3 adrianSceneCenter() {
     const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
@@ -163,8 +163,10 @@ void initializeParticles() {
     for (Particle& particle : particles) {
         const double route = unit(random);
         const double depth = 0.45 + unit(random) * 3.5;
-        const double side = (unit(random) - 0.5) * depth * 0.7;
-        const double height = (unit(random) - 0.5) * depth * 0.7;
+        const double lateral = unit(random) * 2.0 - 1.0;
+        // Spread the field across the frame and favor its left and right edges.
+        const double side = std::copysign(std::sqrt(std::abs(lateral)), lateral) * depth * 0.52;
+        const double height = (unit(random) - 0.5) * depth * 0.85;
         const Vec3 anchor{
             animationStart.position.x + (animationEnd.position.x - animationStart.position.x) * route,
             animationStart.position.y + (animationEnd.position.y - animationStart.position.y) * route,
@@ -262,32 +264,72 @@ void drawHud() {
     glMatrixMode(GL_MODELVIEW);
 }
 
+Vec3 animatedParticlePosition(const Particle& particle) {
+    const double phase = particle.phase + pathPosition * 60.0;
+    return {particle.position.x + 0.12 * std::sin(phase),
+            particle.position.y + 0.10 * std::cos(phase * 1.2),
+            particle.position.z + 0.08 * std::sin(phase * 0.8)};
+}
+
+void drawGlowDisk(const Vec3& position, const Vec3& right, const Vec3& up,
+                  double radius, const Vec3& color, float tint) {
+    constexpr double twoPi = 6.283185307179586;
+    // Interpolated vertex colors give each disk a soft-looking rim without blending.
+    glBegin(GL_TRIANGLE_FAN);
+    glColor3f(static_cast<GLfloat>(color.x * tint),
+              static_cast<GLfloat>(color.y * tint),
+              static_cast<GLfloat>(color.z * tint));
+    glVertex3f(static_cast<GLfloat>(position.x), static_cast<GLfloat>(position.y),
+               static_cast<GLfloat>(position.z));
+    glColor3f(static_cast<GLfloat>(color.x * 0.06),
+              static_cast<GLfloat>(color.y * 0.02),
+              static_cast<GLfloat>(color.z * 0.06));
+    for (int corner = 0; corner <= 12; ++corner) {
+        const double angle = twoPi * corner / 12.0;
+        const double horizontal = radius * std::cos(angle);
+        const double vertical = radius * std::sin(angle);
+        glVertex3f(static_cast<GLfloat>(position.x + right.x * horizontal + up.x * vertical),
+                   static_cast<GLfloat>(position.y + right.y * horizontal + up.y * vertical),
+                   static_cast<GLfloat>(position.z + right.z * horizontal + up.z * vertical));
+    }
+    glEnd();
+}
+
 void drawParticles() {
-    if (!pathReady) return;
-    constexpr double pi = 3.141592653589793;
-    const double pulse = std::sin(pi * pathPosition);
-    const double density = 0.12 + 0.88 * pulse * pulse;
-    const std::array<int, 4> layerEnds{{0, 720, 960, 1000}};
-    const std::array<GLfloat, 3> pointSizes{{2.0f, 4.0f, 7.0f}};
-    const std::array<Vec3, 3> colors{{{0.52, 0.045, 0.17},
-                                       {0.85, 0.16, 0.34},
-                                       {1.0, 0.46, 0.60}}};
+    if (!pathReady || pathPosition <= 0.35 || pathPosition >= 0.45) return;
+    const double density = std::min((pathPosition - 0.35) / 0.05,
+                                    (0.45 - pathPosition) / 0.05);
+    const Vec3 forward = forwardDirection();
+    const Vec3 right{std::cos(cameraYaw), 0.0, std::sin(cameraYaw)};
+    const Vec3 up{right.y * forward.z - right.z * forward.y,
+                  right.z * forward.x - right.x * forward.z,
+                  right.x * forward.y - right.y * forward.x};
     glDisable(GL_LIGHTING);
-    for (int layer = 0; layer < 3; ++layer) {
-        glPointSize(pointSizes[layer]);
-        glBegin(GL_POINTS);
-        for (int i = layerEnds[layer]; i < layerEnds[layer + 1]; ++i) {
-            const Particle& particle = particles[i];
-            if (particle.threshold > density) continue;
-            const double phase = particle.phase + pathPosition * 7.0;
-            glColor3f(static_cast<GLfloat>(colors[layer].x * particle.tint),
-                      static_cast<GLfloat>(colors[layer].y * particle.tint),
-                      static_cast<GLfloat>(colors[layer].z * particle.tint));
-            glVertex3f(static_cast<GLfloat>(particle.position.x + 0.12 * std::sin(phase)),
-                       static_cast<GLfloat>(particle.position.y + 0.10 * std::cos(phase * 1.2)),
-                       static_cast<GLfloat>(particle.position.z + 0.08 * std::sin(phase * 0.8)));
-        }
-        glEnd();
+    glPointSize(2.0f);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < 1050; ++i) {
+        const Particle& particle = particles[i];
+        if (particle.threshold > density) continue;
+        const Vec3 position = animatedParticlePosition(particle);
+        glColor3f(0.65f * particle.tint, 0.07f * particle.tint,
+                  0.22f * particle.tint);
+        glVertex3f(static_cast<GLfloat>(position.x), static_cast<GLfloat>(position.y),
+                   static_cast<GLfloat>(position.z));
+    }
+    glEnd();
+    for (int i = 1050; i < static_cast<int>(particles.size()); ++i) {
+        const Particle& particle = particles[i];
+        if (particle.threshold > density) continue;
+        const Vec3 position = animatedParticlePosition(particle);
+        const Vec3 offset{position.x - camera.x, position.y - camera.y,
+                          position.z - camera.z};
+        const double depth = offset.x * forward.x + offset.y * forward.y + offset.z * forward.z;
+        if (depth <= 0.06) continue;
+        const bool bright = i >= 1430;
+        const double pixels = bright ? 11.0 : 6.0;
+        const double radius = pixels * 0.828427124746 * depth / windowHeight;
+        const Vec3 color = bright ? Vec3{1.0, 0.60, 0.72} : Vec3{0.90, 0.20, 0.40};
+        drawGlowDisk(position, right, up, radius, color, particle.tint);
     }
     glEnable(GL_LIGHTING);
 }
