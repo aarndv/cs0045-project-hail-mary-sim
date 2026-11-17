@@ -43,7 +43,7 @@ struct RenderMesh {
     GLsizei indexCount = 0;
 };
 RenderMesh modelMesh, adrianMesh;
-GLuint adrianTexture = 0;
+GLuint adrianTexture = 0, redAdrianTexture = 0;
 const Vec3 initialCamera{0.0, 0.0, 1.6 + adrian_data::modelZOffset};
 constexpr double adrianScale = 1.2; // 60% of Adrian's previous diameter.
 constexpr double adrianDropFraction = 0.10; // Fraction of its displayed diameter.
@@ -70,8 +70,9 @@ double pathPosition = 0.0, pathDistance = 0.0;
 struct Particle {
     Vec3 position;
     float phase = 0.0f, threshold = 0.0f, tint = 1.0f;
+    bool followsCamera = false;
 };
-std::array<Particle, 3000> particles{};
+std::array<Particle, 6000> particles{};
 
 Vec3 adrianSceneCenter() {
     const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
@@ -160,20 +161,35 @@ void initializeParticles() {
     const Vec3 up{right.y * forward.z - right.z * forward.y,
                   right.z * forward.x - right.x * forward.z,
                   right.x * forward.y - right.y * forward.x};
-    for (Particle& particle : particles) {
-        const double route = unit(random);
-        const double depth = 0.45 + unit(random) * 3.5;
-        const double lateral = unit(random) * 2.0 - 1.0;
-        // Spread the field across the frame and favor its left and right edges.
-        const double side = std::copysign(std::sqrt(std::abs(lateral)), lateral) * depth * 0.52;
-        const double height = (unit(random) - 0.5) * depth * 0.85;
-        const Vec3 anchor{
-            animationStart.position.x + (animationEnd.position.x - animationStart.position.x) * route,
-            animationStart.position.y + (animationEnd.position.y - animationStart.position.y) * route,
-            animationStart.position.z + (animationEnd.position.z - animationStart.position.z) * route};
-        particle.position = {anchor.x + forward.x * depth + right.x * side + up.x * height,
-                             anchor.y + forward.y * depth + right.y * side + up.y * height,
-                             anchor.z + forward.z * depth + right.z * side + up.z * height};
+    for (std::size_t i = 0; i < particles.size(); ++i) {
+        Particle& particle = particles[i];
+        particle.followsCamera = i % 4 == 0;
+        if (particle.followsCamera) {
+            // A circular screen-space layer keeps the sides populated at pos2.
+            const bool fillsCenter = i % 12 == 0;
+            const double angle = fillsCenter ? unit(random) * 6.283185307179586 :
+                (unit(random) * 2.0 - 1.0) * 1.1;
+            const double side = fillsCenter || unit(random) < 0.5 ? -1.0 : 1.0;
+            const double radius = fillsCenter ? std::sqrt(unit(random)) * 0.98 :
+                0.66 + unit(random) * 0.32;
+            particle.position = {side * std::cos(angle) * radius,
+                                 std::sin(angle) * radius,
+                                 0.4 + unit(random) * 1.4};
+        } else {
+            const double route = unit(random);
+            const double depth = 0.45 + unit(random) * 3.5;
+            const double lateral = unit(random) * 2.0 - 1.0;
+            // Spread the field across the frame and favor its left and right edges.
+            const double side = std::copysign(std::sqrt(std::abs(lateral)), lateral) * depth * 0.52;
+            const double height = (unit(random) - 0.5) * depth * 0.85;
+            const Vec3 anchor{
+                animationStart.position.x + (animationEnd.position.x - animationStart.position.x) * route,
+                animationStart.position.y + (animationEnd.position.y - animationStart.position.y) * route,
+                animationStart.position.z + (animationEnd.position.z - animationStart.position.z) * route};
+            particle.position = {anchor.x + forward.x * depth + right.x * side + up.x * height,
+                                 anchor.y + forward.y * depth + right.y * side + up.y * height,
+                                 anchor.z + forward.z * depth + right.z * side + up.z * height};
+        }
         particle.phase = static_cast<float>(unit(random) * 6.283185307179586);
         particle.threshold = static_cast<float>(unit(random));
         particle.tint = static_cast<float>(0.65 + unit(random) * 0.35);
@@ -208,7 +224,7 @@ void reshape(int width, int height) {
 void drawMesh(const RenderMesh& mesh, bool textured) {
     if (textured) {
         glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, adrianTexture);
+        glBindTexture(GL_TEXTURE_2D, pathPosition >= 0.40 ? redAdrianTexture : adrianTexture);
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     }
     glBindBuffer(GL_ARRAY_BUFFER, mesh.vertexBuffer);
@@ -251,7 +267,7 @@ void drawHud() {
     hudText(18.0f, top - 25.0f, "Play [3]");
     glColor3f(0.78f, 0.88f, 0.83f);
     hudText(10.0f, top - 52.0f,
-            "W/S: scrub camera | pink field starts at 40% | 3: autoplay | Esc: exit");
+            "W/S: scrub camera | red field and Adrian at 40% | 3: autoplay | Esc: exit");
     const std::string progress = pathReady ?
         "  Path: " + std::to_string(static_cast<int>(pathPosition * 100.0 + 0.5)) + "%" : "";
     hudText(10.0f, top - 70.0f, hudStatus + progress);
@@ -265,25 +281,41 @@ void drawHud() {
 }
 
 Vec3 animatedParticlePosition(const Particle& particle) {
-    const double phase = particle.phase + pathPosition * 60.0;
+    const double phase = particle.phase + pathPosition * 20.0;
+    if (particle.followsCamera) {
+        const Vec3 forward = forwardDirection();
+        const Vec3 right{std::cos(cameraYaw), 0.0, std::sin(cameraYaw)};
+        const Vec3 up{right.y * forward.z - right.z * forward.y,
+                      right.z * forward.x - right.x * forward.z,
+                      right.x * forward.y - right.y * forward.x};
+        constexpr double tanHalfFov = 0.414213562373095;
+        const double depth = particle.position.z;
+        const double x = (particle.position.x + 0.018 * std::sin(phase)) *
+                         depth * tanHalfFov;
+        const double y = (particle.position.y + 0.018 * std::cos(phase * 1.2)) *
+                         depth * tanHalfFov;
+        return {camera.x + forward.x * depth + right.x * x + up.x * y,
+                camera.y + forward.y * depth + right.y * x + up.y * y,
+                camera.z + forward.z * depth + right.z * x + up.z * y};
+    }
     return {particle.position.x + 0.12 * std::sin(phase),
             particle.position.y + 0.10 * std::cos(phase * 1.2),
             particle.position.z + 0.08 * std::sin(phase * 0.8)};
 }
 
 void drawGlowDisk(const Vec3& position, const Vec3& right, const Vec3& up,
-                  double radius, const Vec3& color, float tint) {
+                  double radius, const Vec3& color, float tint, float opacity) {
     constexpr double twoPi = 6.283185307179586;
-    // Interpolated vertex colors give each disk a soft-looking rim without blending.
+    // Additive blending fades the rim into the scene without a dark outline.
     glBegin(GL_TRIANGLE_FAN);
-    glColor3f(static_cast<GLfloat>(color.x * tint),
+    glColor4f(static_cast<GLfloat>(color.x * tint),
               static_cast<GLfloat>(color.y * tint),
-              static_cast<GLfloat>(color.z * tint));
+              static_cast<GLfloat>(color.z * tint), opacity);
     glVertex3f(static_cast<GLfloat>(position.x), static_cast<GLfloat>(position.y),
                static_cast<GLfloat>(position.z));
-    glColor3f(static_cast<GLfloat>(color.x * 0.06),
-              static_cast<GLfloat>(color.y * 0.02),
-              static_cast<GLfloat>(color.z * 0.06));
+    glColor4f(static_cast<GLfloat>(color.x * tint),
+              static_cast<GLfloat>(color.y * tint),
+              static_cast<GLfloat>(color.z * tint), 0.0f);
     for (int corner = 0; corner <= 12; ++corner) {
         const double angle = twoPi * corner / 12.0;
         const double horizontal = radius * std::cos(angle);
@@ -304,6 +336,9 @@ void drawParticles() {
                   right.z * forward.x - right.x * forward.z,
                   right.x * forward.y - right.y * forward.x};
     glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    glDepthMask(GL_FALSE);
     for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
         const Particle& particle = particles[i];
         if (particle.threshold > density) continue;
@@ -312,16 +347,33 @@ void drawParticles() {
                           position.z - camera.z};
         const double depth = offset.x * forward.x + offset.y * forward.y + offset.z * forward.z;
         if (depth <= 0.06) continue;
-        const double pixels = i < 2100 ? 3.0 : (i < 2860 ? 6.0 : 11.0);
-        const double radius = pixels * 0.828427124746 * depth / windowHeight;
-        const Vec3 color = i < 2100 ? Vec3{0.65, 0.07, 0.22} :
-                           (i < 2860 ? Vec3{0.90, 0.20, 0.40} : Vec3{1.0, 0.60, 0.72});
-        drawGlowDisk(position, right, up, radius, color, particle.tint);
+        const double pixelScale = 0.828427124746 * depth / windowHeight;
+        const Vec3 color = i < 4200 ? Vec3{0.70, 0.08, 0.25} :
+                           (i < 5720 ? Vec3{1.0, 0.22, 0.46} : Vec3{1.0, 0.58, 0.72});
+        if (i < 4200) {
+            drawGlowDisk(position, right, up, 5.0 * pixelScale, color, particle.tint, 0.55f);
+        } else {
+            const double haloPixels = i < 5720 ? 12.0 : 20.0;
+            const double corePixels = i < 5720 ? 3.5 : 5.0;
+            drawGlowDisk(position, right, up, haloPixels * pixelScale, color,
+                         particle.tint, 0.32f);
+            drawGlowDisk(position, right, up, corePixels * pixelScale, color,
+                         particle.tint, 0.86f);
+        }
     }
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
     glEnable(GL_LIGHTING);
 }
 
 void display() {
+    const float redMix = static_cast<float>(std::clamp((pathPosition - 0.40) / 0.07, 0.0, 1.0));
+    glClearColor(0.003f + 0.087f * redMix, 0.005f + 0.007f * redMix,
+                 0.012f + 0.020f * redMix, 1.0f);
+    const GLfloat spaceAmbient[] = {0.003f + 0.15f * redMix,
+                                    0.004f + 0.012f * redMix,
+                                    0.005f + 0.025f * redMix, 1.0f};
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, spaceAmbient);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -333,14 +385,22 @@ void display() {
     // Only the green bounce lights the ship; Adrian's star lighting is set afterward.
     glDisable(GL_LIGHT0);
     const GLfloat topReflectionDirection[] = {-0.35f, 1.0f, 0.12f, 0.0f};
+    const GLfloat topReflectionDiffuse[] = {0.04f + 0.26f * redMix,
+                                            0.24f - 0.15f * redMix,
+                                            0.056f + 0.064f * redMix, 1.0f};
+    const GLfloat topReflectionSpecular[] = {0.024f + 0.18f * redMix,
+                                             0.288f - 0.19f * redMix,
+                                             0.048f + 0.05f * redMix, 1.0f};
     glLightfv(GL_LIGHT2, GL_POSITION, topReflectionDirection);
+    glLightfv(GL_LIGHT2, GL_DIFFUSE, topReflectionDiffuse);
+    glLightfv(GL_LIGHT2, GL_SPECULAR, topReflectionSpecular);
     glEnable(GL_LIGHT2);
 
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_NORMAL_ARRAY);
     glPushMatrix();
     glTranslatef(0.0f, 0.0f, adrian_data::modelZOffset);
-    const GLfloat shipAmbient[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    const GLfloat shipAmbient[] = {0.40f, 0.15f, 0.18f, 1.0f};
     const GLfloat shipDiffuse[] = {0.58f, 0.62f, 0.66f, 1.0f};
     const GLfloat shipSpecular[] = {0.55f, 0.55f, 0.55f, 1.0f};
     const GLfloat shipShininess[] = {44.0f};
@@ -355,10 +415,12 @@ void display() {
     const GLfloat planetSpecular[] = {0.0f, 0.0f, 0.0f, 1.0f};
     const GLfloat planetDiffuse[] = {1.0f, 1.0f, 1.0f, 1.0f};
     const GLfloat planetAmbient[] = {0.18f, 0.20f, 0.14f, 1.0f};
-    const GLfloat limeStarDiffuse[] = {0.62f, 1.0f, 0.24f, 1.0f};
+    const GLfloat planetStarDiffuse[] = {0.62f + 0.38f * redMix,
+                                         1.0f - 0.70f * redMix,
+                                         0.24f - 0.02f * redMix, 1.0f};
     const GLfloat planetStarDirection[] = {0.2f, 1.0f, 0.1f, 0.0f};
     glLightfv(GL_LIGHT0, GL_POSITION, planetStarDirection);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, limeStarDiffuse);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, planetStarDiffuse);
     glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, planetAmbient);
     glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, planetDiffuse);
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, planetSpecular);
@@ -444,6 +506,23 @@ void uploadMesh(const Mesh& mesh, RenderMesh& target) {
     target.indexCount = static_cast<GLsizei>(mesh.indices.size());
 }
 
+GLuint loadTexture(const std::filesystem::path& path) {
+    int width = 0, height = 0, channels = 0;
+    unsigned char* pixels = stbi_load(path.string().c_str(), &width, &height, &channels, 3);
+    if (!pixels) throw std::runtime_error("Cannot load Adrian texture: " + path.string());
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+    stbi_image_free(pixels);
+    return texture;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -479,35 +558,16 @@ int main(int argc, char** argv) {
         glEnable(GL_LIGHT0);
         const GLfloat spaceAmbient[] = {0.003f, 0.004f, 0.005f, 1.0f};
         const GLfloat starAmbient[] = {0.0f, 0.0f, 0.0f, 1.0f};
-        const GLfloat topReflectedGreen[] = {0.04f, 0.24f, 0.056f, 1.0f};
-        const GLfloat topReflectedSpecular[] = {0.024f, 0.288f, 0.048f, 1.0f};
         const GLfloat noAmbient[] = {0.0f, 0.0f, 0.0f, 1.0f};
         glLightModelfv(GL_LIGHT_MODEL_AMBIENT, spaceAmbient);
         glLightfv(GL_LIGHT0, GL_AMBIENT, starAmbient);
         glLightfv(GL_LIGHT2, GL_AMBIENT, noAmbient);
-        glLightfv(GL_LIGHT2, GL_DIFFUSE, topReflectedGreen);
-        glLightfv(GL_LIGHT2, GL_SPECULAR, topReflectedSpecular);
 
         uploadMesh(model, modelMesh);
         uploadMesh(adrian, adrianMesh);
-        glGenTextures(1, &adrianTexture);
-        glBindTexture(GL_TEXTURE_2D, adrianTexture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-        const std::filesystem::path texturePath = cameraFileDirectory / "adrian_texture_map.jpg";
-        int textureWidth = 0, textureHeight = 0, textureChannels = 0;
         stbi_set_flip_vertically_on_load(1);
-        unsigned char* texturePixels = stbi_load(texturePath.string().c_str(),
-            &textureWidth, &textureHeight, &textureChannels, 3);
-        if (!texturePixels) {
-            throw std::runtime_error("Cannot load Adrian texture: " + texturePath.string());
-        }
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, textureWidth,
-                     textureHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, texturePixels);
-        stbi_image_free(texturePixels);
+        adrianTexture = loadTexture(cameraFileDirectory / "adrian_texture_map.jpg");
+        redAdrianTexture = loadTexture(cameraFileDirectory / "red_adrian_texture.png");
 
         std::cout << "Controls: hold W/S to move between pos1 and pos2; "
                      "3 to autoplay; Esc to exit\n";
