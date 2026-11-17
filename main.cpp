@@ -71,7 +71,7 @@ double pathPosition = 0.0, pathDistance = 0.0;
 
 struct Particle {
     Vec3 position;
-    float phase = 0.0f, threshold = 0.0f, tint = 1.0f;
+    float phase = 0.0f, threshold = 0.0f, tint = 1.0f, crowding = 0.0f;
 };
 std::array<Particle, 18000> particles{};
 
@@ -172,6 +172,16 @@ void initializeParticles() {
         particle.threshold = static_cast<float>(unit(random));
         particle.tint = static_cast<float>(0.65 + unit(random) * 0.35);
     }
+    // Screen-space neighbors stay nearly the same while this field follows the camera.
+    const auto cell = [](const Particle& p) {
+        const int x = std::clamp(static_cast<int>((p.position.x + 2.45) * 32.0 / 4.90), 0, 31);
+        const int y = std::clamp(static_cast<int>((p.position.y + 2.45) * 32.0 / 4.90), 0, 31);
+        return y * 32 + x;
+    };
+    std::array<int, 32 * 32> neighbors{};
+    for (const Particle& particle : particles) ++neighbors[cell(particle)];
+    for (Particle& particle : particles)
+        particle.crowding = std::clamp((neighbors[cell(particle)] - 12) / 50.0f, 0.0f, 1.0f);
 }
 
 void startAnimation() {
@@ -265,7 +275,9 @@ Vec3 animatedParticlePosition(const Particle& particle, const Vec3& forward,
                               const Vec3& right, const Vec3& up) {
     const double phase = particle.phase + pathPosition * 20.0;
     constexpr double tanHalfFov = 0.414213562373095;
-    const double depth = particle.position.z;
+    double depth = particle.position.z;
+    if (depth < 0.30)
+        depth = std::fmod(depth + 1.60 - std::max(0.0, pathPosition - 0.40) * 2.80, 1.60);
     const double x = (particle.position.x + 0.018 * std::sin(phase)) * depth * tanHalfFov;
     const double y = (particle.position.y + 0.018 * std::cos(phase * 1.2)) * depth * tanHalfFov;
     return {particleAnchor.x + forward.x * depth + right.x * x + up.x * y,
@@ -274,15 +286,16 @@ Vec3 animatedParticlePosition(const Particle& particle, const Vec3& forward,
 }
 
 void drawParticleDisk(const Vec3& position, const Vec3& right, const Vec3& up,
-                      double radius, const Vec3& color, float tint) {
+                      double radius, const Vec3& color, float tint, float opacity,
+                      float rimOpacity = 0.0f) {
     constexpr double twoPi = 6.283185307179586;
     glBegin(GL_TRIANGLE_FAN);
     glColor4f(static_cast<GLfloat>(color.x * tint), static_cast<GLfloat>(color.y * tint),
-              static_cast<GLfloat>(color.z * tint), 0.58f);
+              static_cast<GLfloat>(color.z * tint), opacity);
     glVertex3f(static_cast<GLfloat>(position.x), static_cast<GLfloat>(position.y),
                static_cast<GLfloat>(position.z));
     glColor4f(static_cast<GLfloat>(color.x * tint), static_cast<GLfloat>(color.y * tint),
-              static_cast<GLfloat>(color.z * tint), 0.0f);
+              static_cast<GLfloat>(color.z * tint), rimOpacity);
     for (int corner = 0; corner <= 8; ++corner) {
         const double angle = twoPi * corner / 8.0;
         const double horizontal = radius * std::cos(angle);
@@ -336,10 +349,16 @@ void drawParticles() {
         if (depth < 2.6 && (shipFade > 0.65 || particle.threshold < shipFade)) continue;
         const double pixelScale = 0.828427124746 * depth / windowHeight;
         const double pixels = (i < 12600 ? 4.5 : (i < 17160 ? 8.0 : 14.0)) *
-                              std::min(2.0, 0.7 + 0.45 / depth);
+                              std::min(particle.position.z < 0.30 ? 3.0 : 2.0,
+                                       0.7 + 0.45 / depth);
         const Vec3 color = i < 12600 ? Vec3{0.75, 0.08, 0.28} :
                            (i < 17160 ? Vec3{1.0, 0.28, 0.52} : Vec3{1.0, 0.70, 0.82});
-        drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale, color, particle.tint);
+        const float tint = particle.tint * (1.0f + 0.25f * particle.crowding);
+        drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale, color,
+                         tint, 0.50f + 0.35f * particle.crowding);
+        if (particle.position.z < 0.30 && particle.phase < 2.1f)
+            drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale * 0.22,
+                             {1.0, 0.82, 0.90}, 1.0f, 0.95f, 0.95f);
     }
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
@@ -348,6 +367,7 @@ void drawParticles() {
 
 void display() {
     const float redMix = static_cast<float>(std::clamp((pathPosition - 0.40) / 0.07, 0.0, 1.0));
+    const float particleAmount = static_cast<float>(std::clamp((pathPosition - 0.40) / 0.60, 0.0, 1.0));
     glClearColor(0.003f + 0.087f * redMix, 0.005f + 0.007f * redMix,
                  0.012f + 0.020f * redMix, 1.0f);
     const GLfloat spaceAmbient[] = {0.003f + 0.15f * redMix,
@@ -365,10 +385,10 @@ void display() {
     // Only the green bounce lights the ship; Adrian's star lighting is set afterward.
     glDisable(GL_LIGHT0);
     const GLfloat topReflectionDirection[] = {-0.35f, 1.0f, 0.12f, 0.0f};
-    const GLfloat topReflectionDiffuse[] = {0.04f + 0.26f * redMix,
+    const GLfloat topReflectionDiffuse[] = {0.04f + 0.26f * redMix + 0.32f * particleAmount,
                                             0.24f - 0.15f * redMix,
                                             0.056f + 0.064f * redMix, 1.0f};
-    const GLfloat topReflectionSpecular[] = {0.024f + 0.18f * redMix,
+    const GLfloat topReflectionSpecular[] = {0.024f + 0.18f * redMix + 0.22f * particleAmount,
                                              0.288f - 0.19f * redMix,
                                              0.048f + 0.05f * redMix, 1.0f};
     glLightfv(GL_LIGHT2, GL_POSITION, topReflectionDirection);
@@ -384,12 +404,17 @@ void display() {
     const GLfloat shipDiffuse[] = {0.58f, 0.62f, 0.66f, 1.0f};
     const GLfloat shipSpecular[] = {0.55f, 0.55f, 0.55f, 1.0f};
     const GLfloat shipShininess[] = {44.0f};
+    const GLfloat shipEmission[] = {0.18f * particleAmount, 0.006f * particleAmount,
+                                    0.030f * particleAmount, 1.0f};
     glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, shipAmbient);
     glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, shipDiffuse);
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, shipSpecular);
     glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, shipShininess);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, shipEmission);
     drawMesh(modelMesh, false);
     glPopMatrix();
+    const GLfloat noEmission[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, noEmission);
     glDisable(GL_LIGHT2);
     glEnable(GL_LIGHT0);
     const GLfloat planetSpecular[] = {0.0f, 0.0f, 0.0f, 1.0f};
