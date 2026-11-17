@@ -71,7 +71,7 @@ struct Particle {
     Vec3 position;
     float phase = 0.0f, threshold = 0.0f, tint = 1.0f;
 };
-std::array<Particle, 1500> particles{};
+std::array<Particle, 3000> particles{};
 
 Vec3 adrianSceneCenter() {
     const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
@@ -251,7 +251,7 @@ void drawHud() {
     hudText(18.0f, top - 25.0f, "Play [3]");
     glColor3f(0.78f, 0.88f, 0.83f);
     hudText(10.0f, top - 52.0f,
-            "W/S: scrub camera and pink field | 3: autoplay | Esc: exit");
+            "W/S: scrub camera | pink field starts at 40% | 3: autoplay | Esc: exit");
     const std::string progress = pathReady ?
         "  Path: " + std::to_string(static_cast<int>(pathPosition * 100.0 + 0.5)) + "%" : "";
     hudText(10.0f, top - 70.0f, hudStatus + progress);
@@ -296,28 +296,15 @@ void drawGlowDisk(const Vec3& position, const Vec3& right, const Vec3& up,
 }
 
 void drawParticles() {
-    if (!pathReady || pathPosition <= 0.35 || pathPosition >= 0.45) return;
-    const double density = std::min((pathPosition - 0.35) / 0.05,
-                                    (0.45 - pathPosition) / 0.05);
+    if (!pathReady || pathPosition <= 0.40) return;
+    const double density = std::min(1.0, (pathPosition - 0.40) / 0.60);
     const Vec3 forward = forwardDirection();
     const Vec3 right{std::cos(cameraYaw), 0.0, std::sin(cameraYaw)};
     const Vec3 up{right.y * forward.z - right.z * forward.y,
                   right.z * forward.x - right.x * forward.z,
                   right.x * forward.y - right.y * forward.x};
     glDisable(GL_LIGHTING);
-    glPointSize(2.0f);
-    glBegin(GL_POINTS);
-    for (int i = 0; i < 1050; ++i) {
-        const Particle& particle = particles[i];
-        if (particle.threshold > density) continue;
-        const Vec3 position = animatedParticlePosition(particle);
-        glColor3f(0.65f * particle.tint, 0.07f * particle.tint,
-                  0.22f * particle.tint);
-        glVertex3f(static_cast<GLfloat>(position.x), static_cast<GLfloat>(position.y),
-                   static_cast<GLfloat>(position.z));
-    }
-    glEnd();
-    for (int i = 1050; i < static_cast<int>(particles.size()); ++i) {
+    for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
         const Particle& particle = particles[i];
         if (particle.threshold > density) continue;
         const Vec3 position = animatedParticlePosition(particle);
@@ -325,10 +312,10 @@ void drawParticles() {
                           position.z - camera.z};
         const double depth = offset.x * forward.x + offset.y * forward.y + offset.z * forward.z;
         if (depth <= 0.06) continue;
-        const bool bright = i >= 1430;
-        const double pixels = bright ? 11.0 : 6.0;
+        const double pixels = i < 2100 ? 3.0 : (i < 2860 ? 6.0 : 11.0);
         const double radius = pixels * 0.828427124746 * depth / windowHeight;
-        const Vec3 color = bright ? Vec3{1.0, 0.60, 0.72} : Vec3{0.90, 0.20, 0.40};
+        const Vec3 color = i < 2100 ? Vec3{0.65, 0.07, 0.22} :
+                           (i < 2860 ? Vec3{0.90, 0.20, 0.40} : Vec3{1.0, 0.60, 0.72});
         drawGlowDisk(position, right, up, radius, color, particle.tint);
     }
     glEnable(GL_LIGHTING);
