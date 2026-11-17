@@ -7,6 +7,7 @@
 #include <exception>
 #include <fstream>
 #include <sstream>
+#include <string>
 
 namespace scene {
 
@@ -62,22 +63,17 @@ void applyPathPosition() {
 void loadCameraPath() {
     pathReady = readCamera("pos1.csv", animationStart) &&
                 readCamera("pos2.csv", animationEnd);
-    if (!pathReady) {
-        hudStatus = "Missing or invalid pos1.csv / pos2.csv.";
-        return;
-    }
+    if (!pathReady) return;
     const Vec3 delta{animationEnd.position.x - animationStart.position.x,
                      animationEnd.position.y - animationStart.position.y,
                      animationEnd.position.z - animationStart.position.z};
     pathDistance = std::sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
     pathPosition = 0.0;
     applyPathPosition();
-    hudStatus = "At pos1. Hold W to move toward pos2.";
 }
 
 void startAnimation() {
     if (!pathReady) {
-        hudStatus = "Missing or invalid pos1.csv / pos2.csv.";
         glutPostRedisplay();
         return;
     }
@@ -85,7 +81,6 @@ void startAnimation() {
     applyPathPosition();
     animating = true;
     keys.fill(false);
-    hudStatus = "Playing pos1 -> pos2. W/S takes manual control.";
     glutPostRedisplay();
 }
 

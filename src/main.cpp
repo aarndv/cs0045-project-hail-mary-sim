@@ -6,7 +6,6 @@
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
-#include <string>
 
 namespace scene {
 
@@ -24,18 +23,18 @@ void keyboardDown(unsigned char key, int, int) {
     if (pathReady && (key == 'w' || key == 's')) {
         animating = false;
         keys[key] = true;
-        hudStatus = key == 'w' ? "Moving toward pos2." : "Moving toward pos1.";
         glutPostRedisplay();
     }
 }
 
 void keyboardUp(unsigned char key, int, int) {
     keys[movementKey(key)] = false;
+    glutPostRedisplay();
 }
 
 void mouseButton(int button, int state, int x, int y) {
-    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN &&
-        x >= 10 && x < 145 && y >= 8 && y < 34) startAnimation();
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && hudPlayButtonHit(x, y))
+        startAnimation();
 }
 
 void timer(int) {
@@ -56,12 +55,7 @@ void timer(int) {
         }
         if (pathPosition == 0.0 || pathPosition == 1.0) {
             animating = false;
-            const std::string endpoint = pathPosition == 0.0 ?
-                "At pos1. Hold W to move forward." : "At pos2. Hold S to move backward.";
-            if (hudStatus != endpoint) {
-                hudStatus = endpoint;
-                glutPostRedisplay();
-            }
+            glutPostRedisplay();
         }
     }
     glutTimerFunc(16, timer, 0);

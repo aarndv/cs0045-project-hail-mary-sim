@@ -14,7 +14,6 @@ std::array<bool, 256> keys{};
 int lastFrameTime = 0;
 int windowWidth = 900, windowHeight = 700;
 std::filesystem::path cameraFileDirectory, textureFileDirectory;
-std::string hudStatus = "Loading pos1.csv and pos2.csv...";
 CameraState animationStart, animationEnd;
 bool pathReady = false, animating = false;
 double pathPosition = 0.0, pathDistance = 0.0;

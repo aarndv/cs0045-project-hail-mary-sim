@@ -42,9 +42,23 @@ void drawMesh(const RenderMesh& mesh, bool textured) {
     }
 }
 
-void hudText(float x, float y, const std::string& line) {
+void hudText(float x, float y, const std::string& line, void* font) {
     glRasterPos2f(x, y);
-    for (unsigned char letter : line) glutBitmapCharacter(GLUT_BITMAP_8_BY_13, letter);
+    for (unsigned char letter : line) glutBitmapCharacter(font, letter);
+}
+
+void hudRect(float left, float bottom, float right, float top) {
+    glBegin(GL_QUADS);
+    glVertex2f(left, bottom);
+    glVertex2f(right, bottom);
+    glVertex2f(right, top);
+    glVertex2f(left, top);
+    glEnd();
+}
+
+bool hudPlayButtonHit(int x, int y) {
+    const int right = std::min(windowWidth - 16, 468);
+    return pathReady && x >= right - 112 && x < right - 16 && y >= 56 && y < 82;
 }
 
 void drawHud() {
@@ -58,22 +72,72 @@ void drawHud() {
     glDisable(GL_LIGHTING);
     glDisable(GL_DEPTH_TEST);
 
-    const float top = static_cast<float>(windowHeight);
-    glColor3f(0.08f, 0.16f, 0.14f);
+    const float left = 16.0f;
+    const float right = static_cast<float>(std::min(windowWidth - 16, 468));
+    const float top = static_cast<float>(windowHeight - 16);
+    const float bottom = top - 143.0f;
+    const float red = static_cast<float>(std::clamp((pathPosition - 0.40) / 0.07, 0.0, 1.0));
+    const float accentR = 0.26f + 0.68f * red;
+    const float accentG = 0.84f - 0.43f * red;
+    const float accentB = 0.68f - 0.24f * red;
+
+    glColor3f(0.004f, 0.007f, 0.012f);
+    hudRect(left + 4, bottom - 4, right + 4, top - 4);
     glBegin(GL_QUADS);
-    glVertex2f(10.0f, top - 34.0f);
-    glVertex2f(145.0f, top - 34.0f);
-    glVertex2f(145.0f, top - 8.0f);
-    glVertex2f(10.0f, top - 8.0f);
+    glColor3f(0.010f + 0.015f * red, 0.018f, 0.027f);
+    glVertex2f(left, bottom);
+    glVertex2f(right, bottom);
+    glColor3f(0.026f + 0.022f * red, 0.037f, 0.050f);
+    glVertex2f(right, top);
+    glVertex2f(left, top);
     glEnd();
-    glColor3f(0.88f, 1.0f, 0.92f);
-    hudText(18.0f, top - 25.0f, "Play [3]");
-    glColor3f(0.78f, 0.88f, 0.83f);
-    hudText(10.0f, top - 52.0f,
-            "W/S: scrub camera | red field and Adrian at 40% | 3: autoplay | Esc: exit");
-    const std::string progress = pathReady ?
-        "  Path: " + std::to_string(static_cast<int>(pathPosition * 100.0 + 0.5)) + "%" : "";
-    hudText(10.0f, top - 70.0f, hudStatus + progress);
+    glColor3f(accentR, accentG, accentB);
+    hudRect(left, top - 3.0f, right, top);
+
+    glColor3f(0.94f, 0.97f, 0.98f);
+    hudText(left + 16, top - 33, "CAMERA PATH", GLUT_BITMAP_HELVETICA_18);
+    glColor3f(0.60f, 0.68f, 0.73f);
+    hudText(right - 137, top - 30, "POS1  >  POS2", GLUT_BITMAP_8_BY_13);
+
+    const std::string status = !pathReady ? "Camera path unavailable" :
+        animating ? "Playing camera path" :
+        pathPosition <= 0.0 ? "Ready at pos1" :
+        pathPosition >= 1.0 ? "Arrived at pos2" :
+        keys['w'] && !keys['s'] ? "Moving toward pos2" :
+        keys['s'] && !keys['w'] ? "Moving toward pos1" : "Paused on camera path";
+    glColor3f(0.84f, 0.91f, 0.93f);
+    hudText(left + 16, top - 61, status, GLUT_BITMAP_9_BY_15);
+
+    glColor3f(0.055f + 0.18f * accentR, 0.055f + 0.18f * accentG,
+              0.065f + 0.18f * accentB);
+    hudRect(right - 112, top - 66, right - 16, top - 40);
+    glColor3f(pathReady ? 0.95f : 0.50f, pathReady ? 0.98f : 0.56f,
+              pathReady ? 0.98f : 0.60f);
+    hudText(right - (pathReady && pathPosition > 0.0 ? 104 : 99), top - 58,
+            !pathReady ? "NO PATH" : pathPosition > 0.0 ? "REPLAY [3]" : "PLAY [3]",
+            GLUT_BITMAP_8_BY_13);
+
+    glColor3f(accentR, accentG, accentB);
+    hudText(left + 16, top - 86,
+            pathPosition >= 0.40 ? "RED FIELD ACTIVE" : "RED FIELD AT 40%",
+            GLUT_BITMAP_8_BY_13);
+    const int percent = pathReady ? static_cast<int>(pathPosition * 100.0 + 0.5) : 0;
+    hudText(right - 60, top - 86, std::to_string(percent) + "%", GLUT_BITMAP_8_BY_13);
+
+    glColor3f(0.11f, 0.15f, 0.18f);
+    hudRect(left + 16, top - 105, right - 16, top - 98);
+    glColor3f(accentR, accentG, accentB);
+    hudRect(left + 16, top - 105,
+            left + 16 + (right - left - 32) * static_cast<float>(pathPosition), top - 98);
+    glColor3f(0.88f, 0.93f, 0.94f);
+    const float marker = left + 16 + (right - left - 32) * 0.40f;
+    hudRect(marker - 1, top - 107, marker + 1, top - 96);
+
+    glColor3f(0.68f, 0.76f, 0.79f);
+    hudText(left + 16, top - 127,
+            pathReady ? "Hold W/S: move  |  3: autoplay  |  Esc: exit" :
+                        "Check assets/camera/pos1.csv and pos2.csv",
+            GLUT_BITMAP_8_BY_13);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);

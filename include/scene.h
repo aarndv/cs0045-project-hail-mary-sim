@@ -4,7 +4,6 @@
 
 #include <array>
 #include <filesystem>
-#include <string>
 
 namespace scene {
 
@@ -39,7 +38,6 @@ extern double moveSpeed, cameraYaw, cameraPitch, particleYaw, particlePitch;
 extern std::array<bool, 256> keys;
 extern int lastFrameTime, windowWidth, windowHeight;
 extern std::filesystem::path cameraFileDirectory, textureFileDirectory;
-extern std::string hudStatus;
 extern CameraState animationStart, animationEnd;
 extern bool pathReady, animating;
 extern double pathPosition, pathDistance;
@@ -55,6 +53,7 @@ void initializeSceneTextures();
 void drawParticles();
 void reshape(int width, int height);
 void display();
+bool hudPlayButtonHit(int x, int y);
 void keyboardDown(unsigned char key, int x, int y);
 void keyboardUp(unsigned char key, int x, int y);
 void mouseButton(int button, int state, int x, int y);
