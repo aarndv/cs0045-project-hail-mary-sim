@@ -16,6 +16,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -65,6 +66,12 @@ CameraState animationStart, animationEnd;
 bool pathReady = false;
 bool animating = false;
 double pathPosition = 0.0, pathDistance = 0.0;
+
+struct Particle {
+    Vec3 position;
+    float phase = 0.0f, threshold = 0.0f, tint = 1.0f;
+};
+std::array<Particle, 1000> particles{};
 
 Vec3 adrianSceneCenter() {
     const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
@@ -142,6 +149,35 @@ void loadCameraPath() {
     hudStatus = "At pos1. Hold W to move toward pos2.";
 }
 
+void initializeParticles() {
+    if (!pathReady) return;
+    std::mt19937 random(2026);
+    std::uniform_real_distribution<double> unit(0.0, 1.0);
+    const double yaw = animationStart.yaw, pitch = animationStart.pitch;
+    const Vec3 forward{std::sin(yaw) * std::cos(pitch), std::sin(pitch),
+                       -std::cos(yaw) * std::cos(pitch)};
+    const Vec3 right{std::cos(yaw), 0.0, std::sin(yaw)};
+    const Vec3 up{right.y * forward.z - right.z * forward.y,
+                  right.z * forward.x - right.x * forward.z,
+                  right.x * forward.y - right.y * forward.x};
+    for (Particle& particle : particles) {
+        const double route = unit(random);
+        const double depth = 0.45 + unit(random) * 3.5;
+        const double side = (unit(random) - 0.5) * depth * 0.7;
+        const double height = (unit(random) - 0.5) * depth * 0.7;
+        const Vec3 anchor{
+            animationStart.position.x + (animationEnd.position.x - animationStart.position.x) * route,
+            animationStart.position.y + (animationEnd.position.y - animationStart.position.y) * route,
+            animationStart.position.z + (animationEnd.position.z - animationStart.position.z) * route};
+        particle.position = {anchor.x + forward.x * depth + right.x * side + up.x * height,
+                             anchor.y + forward.y * depth + right.y * side + up.y * height,
+                             anchor.z + forward.z * depth + right.z * side + up.z * height};
+        particle.phase = static_cast<float>(unit(random) * 6.283185307179586);
+        particle.threshold = static_cast<float>(unit(random));
+        particle.tint = static_cast<float>(0.65 + unit(random) * 0.35);
+    }
+}
+
 void startAnimation() {
     if (!pathReady) {
         hudStatus = "Missing or invalid pos1.csv / pos2.csv.";
@@ -212,7 +248,8 @@ void drawHud() {
     glColor3f(0.88f, 1.0f, 0.92f);
     hudText(18.0f, top - 25.0f, "Play [3]");
     glColor3f(0.78f, 0.88f, 0.83f);
-    hudText(10.0f, top - 52.0f, "Hold W: toward pos2 | Hold S: toward pos1 | 3: autoplay | Esc: exit");
+    hudText(10.0f, top - 52.0f,
+            "W/S: scrub camera and pink field | 3: autoplay | Esc: exit");
     const std::string progress = pathReady ?
         "  Path: " + std::to_string(static_cast<int>(pathPosition * 100.0 + 0.5)) + "%" : "";
     hudText(10.0f, top - 70.0f, hudStatus + progress);
@@ -223,6 +260,36 @@ void drawHud() {
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
     glMatrixMode(GL_MODELVIEW);
+}
+
+void drawParticles() {
+    if (!pathReady) return;
+    constexpr double pi = 3.141592653589793;
+    const double pulse = std::sin(pi * pathPosition);
+    const double density = 0.12 + 0.88 * pulse * pulse;
+    const std::array<int, 4> layerEnds{{0, 720, 960, 1000}};
+    const std::array<GLfloat, 3> pointSizes{{2.0f, 4.0f, 7.0f}};
+    const std::array<Vec3, 3> colors{{{0.52, 0.045, 0.17},
+                                       {0.85, 0.16, 0.34},
+                                       {1.0, 0.46, 0.60}}};
+    glDisable(GL_LIGHTING);
+    for (int layer = 0; layer < 3; ++layer) {
+        glPointSize(pointSizes[layer]);
+        glBegin(GL_POINTS);
+        for (int i = layerEnds[layer]; i < layerEnds[layer + 1]; ++i) {
+            const Particle& particle = particles[i];
+            if (particle.threshold > density) continue;
+            const double phase = particle.phase + pathPosition * 7.0;
+            glColor3f(static_cast<GLfloat>(colors[layer].x * particle.tint),
+                      static_cast<GLfloat>(colors[layer].y * particle.tint),
+                      static_cast<GLfloat>(colors[layer].z * particle.tint));
+            glVertex3f(static_cast<GLfloat>(particle.position.x + 0.12 * std::sin(phase)),
+                       static_cast<GLfloat>(particle.position.y + 0.10 * std::cos(phase * 1.2)),
+                       static_cast<GLfloat>(particle.position.z + 0.08 * std::sin(phase * 0.8)));
+        }
+        glEnd();
+    }
+    glEnable(GL_LIGHTING);
 }
 
 void display() {
@@ -269,6 +336,7 @@ void display() {
     drawMesh(adrianMesh, true);
     glDisableClientState(GL_NORMAL_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
+    drawParticles();
     drawHud();
     glutSwapBuffers();
 }
@@ -353,6 +421,7 @@ int main(int argc, char** argv) {
     try {
         cameraFileDirectory = std::filesystem::absolute(argv[0]).parent_path();
         loadCameraPath();
+        initializeParticles();
         Mesh model = loadEmbeddedMesh();
         Mesh adrian = loadAdrianMesh();
         const Vec3 placed = adrianSceneCenter();
