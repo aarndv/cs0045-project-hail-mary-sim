@@ -5,7 +5,7 @@
             "name": "Build and Debug Scene",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/phm-scene",
+            "program": "${workspaceFolder}/phm-scene",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

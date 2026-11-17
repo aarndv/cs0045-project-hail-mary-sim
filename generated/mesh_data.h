@@ -1,6 +1,10 @@
 #pragma once
-#include "mesh_types.h"
+#include <GL/glew.h>
+#include <vector>
 #include <iterator>
+
+struct Vertex { GLfloat x, y, z, nx, ny, nz, u, v; };
+struct Mesh { std::vector<Vertex> vertices; std::vector<GLuint> indices; };
 
 namespace ship_data {
 const Vertex vertices[7461] = {

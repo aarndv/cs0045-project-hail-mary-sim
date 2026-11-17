@@ -4,8 +4,8 @@
             "name": "Linux GCC",
             "compilerPath": "/usr/bin/g++",
             "includePath": [
-                "${workspaceFolder}/include",
-                "${workspaceFolder}/src/generated",
+                "${workspaceFolder}",
+                "${workspaceFolder}/generated",
                 "${workspaceFolder}/third_party",
                 "/usr/include",
                 "/usr/include/GL"

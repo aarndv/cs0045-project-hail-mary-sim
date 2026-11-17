@@ -4,9 +4,19 @@
         {
             "label": "Build scene",
             "type": "shell",
-            "command": "make",
+            "command": "/usr/bin/g++",
             "args": [
-                "all"
+                "-g",
+                "-std=c++17",
+                "-Wall",
+                "-Wextra",
+                "main.cpp",
+                "-o",
+                "phm-scene",
+                "-lglut",
+                "-lGL",
+                "-lGLU",
+                "-lGLEW"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -22,10 +32,9 @@
         {
             "label": "Run scene",
             "type": "shell",
-            "command": "make",
-            "args": [
-                "run"
-            ],
+            "command": "./phm-scene",
+            "args": [],
+            "dependsOn": "Build scene",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
