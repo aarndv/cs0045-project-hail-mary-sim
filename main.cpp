@@ -74,7 +74,7 @@ struct Particle {
     float phase = 0.0f, threshold = 0.0f, tint = 1.0f, crowding = 0.0f;
     float route = 0.0f;
 };
-std::array<Particle, 24000> particles{};
+std::array<Particle, 30000> particles{};
 
 Vec3 adrianSceneCenter() {
     const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
@@ -166,12 +166,17 @@ void initializeParticles() {
     for (std::size_t i = 0; i < particles.size(); ++i) {
         Particle& particle = particles[i];
         const bool lateField = i >= 18000;
-        const double angle = unit(random) * 6.283185307179586;
-        // The outer volume extends beyond the camera's view at both endpoints.
-        const double fieldRadius = i % 10 == 0 ? 0.70 : (i % 10 < 5 ? 1.50 : 2.45);
-        const double radius = std::sqrt(unit(random)) * fieldRadius;
+        const bool sideField = i >= 24000;
+        const double angle = sideField ? (unit(random) * 2.0 - 1.0) * 0.80 +
+            (unit(random) < 0.5 ? 0.0 : 3.141592653589793) :
+            unit(random) * 6.283185307179586;
+        // Keep the outer volume circular while favoring its sides over the center.
+        const double fieldRadius = i % 20 == 0 ? 0.70 : (i % 20 < 7 ? 1.50 : 2.45);
+        const double radius = sideField ? 1.40 + unit(random) * 0.80 :
+            std::sqrt(unit(random)) * fieldRadius;
         particle.position = {std::cos(angle) * radius,
                              std::sin(angle) * radius,
+                             sideField ? 0.70 + unit(random) * 1.0 :
                              i % 47 == 0 ? 0.065 + unit(random) * 0.065 :
                              i % 31 == 0 ? 0.08 + unit(random) * 0.20 :
                                           0.35 + unit(random) * 3.30};
@@ -179,8 +184,8 @@ void initializeParticles() {
         particle.threshold = static_cast<float>((lateField ? 0.50 : 0.0) +
             unit(random) * (lateField ? 0.50 : 1.0));
         particle.tint = static_cast<float>(0.65 + unit(random) * 0.35);
-        particle.route = static_cast<float>(lateField ? 0.58 + unit(random) * 0.40 :
-                                                      unit(random) * 0.90);
+        particle.route = static_cast<float>(sideField ? 0.82 + unit(random) * 0.13 :
+            lateField ? 0.58 + unit(random) * 0.40 : unit(random) * 0.90);
     }
     // Nearby projected particles share similar screen positions along the path.
     const auto cell = [](const Particle& p) {
@@ -353,6 +358,7 @@ void drawParticles() {
                                 offset.z * viewUp.z) / (depth * 0.414213562373095);
         if (std::abs(screenX) > static_cast<double>(windowWidth) / windowHeight + 0.25 ||
             std::abs(screenY) > 1.25) continue;
+        if (screenX * screenX + screenY * screenY < 0.65 * 0.65 && i % 9 < 2) continue;
         const double pixelScale = 0.828427124746 * depth / windowHeight;
         const int sizeClass = i % 20;
         const double pixels = (sizeClass < 14 ? 4.5 : (sizeClass < 19 ? 8.0 : 14.0)) *
@@ -376,7 +382,7 @@ void drawParticles() {
 void display() {
     const float redMix = static_cast<float>(std::clamp((pathPosition - 0.40) / 0.07, 0.0, 1.0));
     const float spawn = static_cast<float>(std::clamp((pathPosition - 0.40) / 0.60, 0.0, 1.0));
-    const float particleAmount = 0.75f * spawn + 0.25f * std::max(0.0f, 2.0f * spawn - 1.0f);
+    const float particleAmount = 0.60f * spawn + 0.40f * std::max(0.0f, 2.0f * spawn - 1.0f);
     glClearColor(0.003f + 0.087f * redMix, 0.005f + 0.007f * redMix,
                  0.012f + 0.020f * redMix, 1.0f);
     const GLfloat spaceAmbient[] = {0.003f + 0.15f * redMix,
