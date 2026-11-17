@@ -72,7 +72,7 @@ double pathPosition = 0.0, pathDistance = 0.0;
 struct Particle {
     Vec3 position;
     float phase = 0.0f, threshold = 0.0f, tint = 1.0f, crowding = 0.0f;
-    float route = 0.0f;
+    float route = 0.0f, haloScale = 1.0f;
 };
 std::array<Particle, 30000> particles{};
 
@@ -162,6 +162,7 @@ void loadCameraPath() {
 void initializeParticles() {
     if (!pathReady) return;
     std::mt19937 random(2026);
+    std::mt19937 haloRandom(2031);
     std::uniform_real_distribution<double> unit(0.0, 1.0);
     for (std::size_t i = 0; i < particles.size(); ++i) {
         Particle& particle = particles[i];
@@ -186,6 +187,8 @@ void initializeParticles() {
         particle.tint = static_cast<float>(0.65 + unit(random) * 0.35);
         particle.route = static_cast<float>(sideField ? 0.82 + unit(random) * 0.13 :
             lateField ? 0.58 + unit(random) * 0.40 : unit(random) * 0.90);
+        if (unit(haloRandom) < 0.08)
+            particle.haloScale = static_cast<float>(1.20 + unit(haloRandom) * 1.30);
     }
     // Nearby projected particles share similar screen positions along the path.
     const auto cell = [](const Particle& p) {
@@ -368,7 +371,7 @@ void drawParticles() {
         const Vec3 color = sizeClass < 14 ? Vec3{0.75, 0.08, 0.28} :
                            (sizeClass < 19 ? Vec3{1.0, 0.28, 0.52} : Vec3{1.0, 0.70, 0.82});
         const float tint = particle.tint * (1.0f + 0.25f * particle.crowding);
-        drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale, color,
+        drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale * particle.haloScale, color,
                          tint, static_cast<float>((0.50f + 0.35f * particle.crowding) * visibility));
         if (depth < 0.35 && particle.position.z < 0.30 && particle.phase < 2.1f)
             drawParticleDisk(position, viewRight, viewUp, pixels * pixelScale * 0.22,
