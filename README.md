@@ -15,15 +15,17 @@ Open this repository folder in VS Code to use **Build scene** (Ctrl+Shift+B), **
 
 ## Controls
 
-- Hold **W** or **S** to move between the saved positions.
-- Press **3** or click **Play** to animate from pos1 to pos2.
+- Hold **W** or **S** to move forward or backward along the camera path.
+- Press **3** to start or replay the **Camera Tour**.
+- Press **4** to orbit around Adrian.
+- In orbit mode, hold the **left mouse button** and drag to change the viewing angle and elevation.
 - Press **Esc** to exit.
 
 ## Layout
 
 - `main.cpp`: camera, mesh setup, textures, particles, HUD, and input, grouped into sections.
-- `generated/`: embedded mesh arrays used by `main.cpp`.
-- `assets/camera/`: `pos1.csv` and `pos2.csv`.
+- `mesh_data.h` and `adrian_data.h`: embedded mesh arrays used by `main.cpp`.
+- Camera positions and angles are hardcoded in `main.cpp`.
 - `assets/textures/`: Adrian's texture maps.
 - `third_party/`: the `stb_image` image loader.
 - `misc/`: original OBJ models and the OpenGL syntax reference, kept for reference but not needed to run.
