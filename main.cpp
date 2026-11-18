@@ -12,19 +12,18 @@
  *   Esc           Exit the application.
  * Camera path endpoints are defined directly in this source file.
  *
- * The two 3D meshes come from generated headers; stb_image loads the external
- * texture images. Together with those assets, this is the complete application
- * source. The generated mesh data is kept out of this file for readability.
+ * Mesh, star, and image-loader headers are organized in the data/ folder.
  */
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <GL/glu.h>
 
-#include "mesh_data.h"
-#include "adrian_data.h"
+#include "data/mary_data.h"
+#include "data/adrian_data.h"
+#include "data/stars_data.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "third_party/stb_image.h"
+#include "data/stb_image.h"
 
 #include <algorithm>
 #include <cmath>
@@ -60,7 +59,7 @@ struct RenderMesh
 
 constexpr double shipMoveSpeed = 0.30;
 
-// One saved camera-path endpoint, loaded from a CSV file.
+// One hardcoded camera-path endpoint, with a position and viewing angles.
 struct CameraState
 {
     Vec3 position;
@@ -88,7 +87,7 @@ RenderMesh modelMesh, adrianMesh;
 GLuint adrianTexture = 0, redAdrianTexture = 0;
 
 // Camera path and interaction state. keys[] records held keys, while pathPosition
-// is 0 at pos1 and 1 at pos2; animating enables automatic travel.
+// is 0 at the start and 1 at the destination; animating enables auto travel.
 const Vec3 initialCamera{0.0, 0.0, 1.6 + adrian_data::modelZOffset};
 Vec3 camera = initialCamera;
 Vec3 particleAnchor = initialCamera;
@@ -99,7 +98,7 @@ bool keys[256] = {};
 int lastFrameTime = 0;
 int windowWidth = 900, windowHeight = 700;
 std::filesystem::path textureFileDirectory;
-// Camera endpoints copied from the former pos1.csv and pos2.csv files.
+// Hardcoded start and destination camera positions and viewing angles.
 CameraState animationStart{{-0.2169698016, 0.5950487339, -0.9267616077}, -1.5610, -0.0735};
 CameraState animationEnd{{1.5565662165, 0.7131653820, -0.9155946978}, -1.5645, -0.0665};
 bool pathReady = true;
@@ -458,7 +457,28 @@ void reshape(int width, int height)
     glViewport(0, 0, width, height);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(45.0, static_cast<double>(width) / height, 0.05, 2000.0);
+    gluPerspective(45.0, static_cast<double>(width) / height, 0.05, 5000.0);
+}
+
+// Draw distant points before the meshes so nearer objects naturally cover them.
+void drawStars()
+{
+    glDisable(GL_LIGHTING);
+    glEnable(GL_POINT_SMOOTH);
+    glDepthMask(GL_FALSE);
+
+    for (int i = 0; i < star_data::count; ++i) {
+        const Star& star = star_data::stars[i];
+        glPointSize(static_cast<GLfloat>(star.size));
+        glColor3f(star.red * star.brightness, star.green * star.brightness, star.blue * star.brightness);
+        glBegin(GL_POINTS);
+        glVertex3f(star.x, star.y, star.z);
+        glEnd();
+    }
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_POINT_SMOOTH);
+    glEnable(GL_LIGHTING);
 }
 
 // REQUIREMENT — VBO and 3D mesh: bind the mesh buffers, describe the interleaved
@@ -570,6 +590,8 @@ void display()
     // REQUIREMENT — translation and rotation: position the camera at camera
     // and aim it using the direction calculated from yaw and pitch.
     gluLookAt(camera.x, camera.y, camera.z, camera.x + forward.x, camera.y + forward.y, camera.z + forward.z, 0.0, 1.0, 0.0);
+
+    drawStars();
 
     // REQUIREMENT — lighting: GL_LIGHT2 gives the ship a colored bounce light.
     // After drawing the ship, GL_LIGHT0 illuminates Adrian like a distant star.

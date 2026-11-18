@@ -2,7 +2,7 @@
 
 An interactive FreeGLUT/OpenGL recreation inspired by *Project Hail Mary*. In Andy Weir's story, science teacher Ryland Grace wakes aboard a spacecraft far from Earth and must find why stars are losing energy. His investigation leads to Astrophage, a microscopic organism that feeds on stellar energy. [Sony Pictures' synopsis](https://www.sonypictures.co.uk/movies/project-hail-mary) describes Grace's mission and the mystery he must solve; the [publisher's description](https://www.penguin.co.uk/books/440237/project-hail-mary-by-weir-andy/9781807840020) frames it as a last-chance mission to save Earth.
 
-This scene focuses on the Petrova Line above Adrian. Ryland Grace and his companion Rocky collect crimson Astrophage and discover microbial life in Adrian's atmosphere. That discovery may offer a way to protect both of their suns. The recreation includes the ship, Adrian, animated particles, a camera tour, and a mouse-controlled orbit view.
+This scene focuses on the Petrova Line above Adrian. Ryland Grace and his companion Rocky collect crimson Astrophage and discover microbial life in Adrian's atmosphere. That discovery may offer a way to protect both of their suns. The recreation includes the ship, Adrian, 250 generated background stars, animated particles, a camera tour, and a mouse-controlled orbit view.
 
 ## Build and run
 
@@ -26,9 +26,10 @@ Open this repository folder in VS Code to use **Build scene** (Ctrl+Shift+B), **
 ## Layout
 
 - `main.cpp`: camera, mesh setup, textures, particles, HUD, and input, grouped into sections.
-- `mesh_data.h` and `adrian_data.h`: embedded mesh arrays used by `main.cpp`.
+- `data/mary_data.h` and `data/adrian_data.h`: embedded ship and planet mesh data used by `main.cpp`.
+- `data/stars_data.h`: 250 star positions, colors, brightness levels, and point sizes.
+- `data/stb_image.h`: the single-header image decoder used by `loadTexture()` for JPG and PNG textures.
 - Camera positions and angles are hardcoded in `main.cpp`.
 - `assets/textures/`: Adrian's texture maps.
-- `third_party/stb_image.h`: the single-header image decoder used by `loadTexture()` to load the JPG and PNG texture files.
 
 The program resolves `assets/` relative to the executable, so it can be launched from any working directory while the repository layout stays intact.
