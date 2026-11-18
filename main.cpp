@@ -544,7 +544,7 @@ void drawHud()
     hudText(left, top - 26, status, GLUT_BITMAP_9_BY_15);
 
     glColor3f(0.68f, 0.76f, 0.79f);
-    hudText(left, top - 70, "Hold W/S: move  |  3: Camera Tour  |  4: Orbit Adrian  |  Esc: exit", GLUT_BITMAP_8_BY_13);
+    hudText(left, top - 70, "Hold W/S: move  |  3: Camera Tour  |  4: Orbit Adrian  |  Esc: exit", GLUT_BITMAP_9_BY_15);
     if (orbitingAdrian) hudText(left, top - 100, "DRAG USING YOUR MOUSE TO MOVE", GLUT_BITMAP_HELVETICA_18);
 
     const float descriptionX = static_cast<float>(std::max(360, windowWidth - 370));
