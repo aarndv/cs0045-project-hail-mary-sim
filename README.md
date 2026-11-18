@@ -35,3 +35,4 @@ Open this repository folder in VS Code to use **Build scene** (Ctrl+Shift+B), **
 The program resolves `assets/` relative to the executable, so it can be launched from any working directory while the repository layout stays intact.
 
 For a feature and controls summary, see [Code and Controls Overview](docs/code-overview.md).
+For the five-person walkthrough, see [Video Presentation Script](docs/video-presentation-script.md).
