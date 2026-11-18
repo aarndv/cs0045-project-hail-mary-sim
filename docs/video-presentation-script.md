@@ -2,10 +2,10 @@
 
 **Target duration:** about 4½ minutes at a measured speaking pace.
 
-**Presenters:** Members 1–4 explain the code. Member 5 demonstrates the running output.
-**Recording rule:** Members 1–4 read the presentation paragraphs aloud. Member 5 narrates the live demonstration impromptu, following the **Show** cues. The cues are not spoken. Do not read the code line by line.
+**Presenters:** Charles (Member 1), Ethan (Member 2), Brianne (Member 3), Maxine (Member 4), and Aaron (Member 5).
+**Recording rule:** Members 1–4 read the presentation paragraphs aloud. Aaron narrates the live demonstration impromptu, following the **Show** cues. The cues are not spoken. Do not read the code line by line.
 
-## 0:00–0:55 — Member 1: scene concept and program structure
+## 0:00–0:55 — Charles (Member 1): scene concept and program structure
 
 **Show:** [README scene description](../README.md#L3).
 
@@ -19,7 +19,7 @@ These variables hold the two three-dimensional meshes, their textures, the camer
 
 `main()` prepares the window, meshes, textures, and controls. Every redraw goes through `display()`, which sets the camera, draws the stars and three-dimensional objects, adds the particle field, and places the text overlay on top so it stays readable.
 
-## 0:55–1:45 — Member 2: camera movement and controls
+## 0:55–1:45 — Ethan (Member 2): camera movement and controls
 
 **Show:** [`loadCameraPath()`](../main.cpp#L158), [`startAnimation()`](../main.cpp#L167), and [`applyPathPosition()`](../main.cpp#L137).
 
@@ -33,7 +33,7 @@ Key 4 enters the second view. `updateOrbitCamera()` places the camera on an imag
 
 The keyboard callbacks handle W, S, 3, 4, and Escape. `mouseButton()` detects a left drag, and `mouseDrag()` updates the orbit. The timer advances the tour, while orbit mode stays still until the mouse moves. The HUD reports the current state and controls.
 
-## 1:45–2:35 — Member 3: meshes, transformations, lighting, and textures
+## 1:45–2:35 — Brianne (Member 3): meshes, transformations, lighting, and textures
 
 **Show:** [`initializeSceneMeshes()`](../main.cpp#L241), especially the planet vertex calculations.
 
@@ -47,7 +47,7 @@ The ship and Adrian are separate three-dimensional triangle meshes. `initializeS
 
 `loadTexture()` prepares the images, and `drawMesh()` maps Adrian’s texture onto the planet. In `display()`, one light gives the ship a colored bounce while another lights Adrian. The ambient color becomes redder and the planet’s texture changes as the tour reaches the Astrophage field.
 
-## 2:35–3:15 — Member 4: particles, stars, and the two-dimensional overlay
+## 2:35–3:15 — Maxine (Member 4): particles, stars, and the two-dimensional overlay
 
 **Show:** [`initializeParticles()`](../main.cpp#L295) and [`animatedParticlePosition()`](../main.cpp#L344).
 
@@ -61,7 +61,7 @@ The ship and Adrian are separate three-dimensional triangle meshes. `initializeS
 
 The star data file contains 250 background stars with varied positions, brightness, and sizes. `drawStars()` renders them behind the objects. `drawHud()` switches to screen coordinates to show the camera status, controls, and scene description over the three-dimensional view.
 
-## 3:15–4:30 — Member 5: live output demonstration
+## 3:15–4:30 — Aaron (Member 5): live output demonstration
 
 Narrate the live demonstration impromptu, using the cues below to guide the sequence.
 
@@ -78,5 +78,5 @@ Narrate the live demonstration impromptu, using the cues below to guide the sequ
 ## Recording checklist
 
 - Keep the source text large enough to read while showing the linked lines.
-- Use the code cues for Members 1–4 and the application output for Member 5.
+- Use the code cues for Charles, Ethan, Brianne, and Maxine; Aaron demonstrates the application output.
 - Rehearse Members 1–4 at a steady pace; keep the live demonstration concise to stay close to four and a half minutes overall.
