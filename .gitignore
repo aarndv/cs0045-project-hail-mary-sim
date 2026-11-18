@@ -1,5 +1,5 @@
 /build/
-/misc/legacy-build/
+/misc/
 /main
 /phm-scene
 *.o
