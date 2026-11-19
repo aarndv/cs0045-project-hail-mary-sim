@@ -180,19 +180,16 @@ void startAnimation()
 
 // --- Embedded meshes ----------------------------------------------
 
-constexpr double adrianScale = 1.2;
-constexpr double adrianDropFraction = 0.10;
-
 // Place the enlarged planet relative to the ship and lower it slightly.
 Vec3 adrianSceneCenter()
 {
-    const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
+    const Vec3 original(adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ);
     const Vec3 fromShip{original.x, original.y, original.z - adrian_data::modelZOffset};
     const double distance = std::sqrt(fromShip.x * fromShip.x + fromShip.y * fromShip.y + fromShip.z * fromShip.z);
-    const double shift = (adrianScale - 1.0) * adrian_data::radius / distance;
+    const double shift = (1.2 - 1.0) * adrian_data::radius / distance;
     const Vec3 placed{original.x + fromShip.x * shift, original.y + fromShip.y * shift, original.z + fromShip.z * shift};
-    const double centerDistance = distance + (adrianScale - 1.0) * adrian_data::radius;
-    const double loweredY = placed.y - adrianDropFraction * (2.0 * adrian_data::radius * adrianScale);
+    const double centerDistance = distance + (1.2 - 1.0) * adrian_data::radius;
+    const double loweredY = placed.y - 0.10 * (2.0 * adrian_data::radius * 1.2);
     const double zFromShip = placed.z - adrian_data::modelZOffset;
     const double xFromShip = std::copysign(std::sqrt(std::max(0.0, centerDistance * centerDistance - loweredY * loweredY - zFromShip * zFromShip)), placed.x);
     return {xFromShip, loweredY, placed.z};
@@ -246,9 +243,9 @@ void initializeSceneMeshes()
     // REQUIREMENT — scaling and translation: resize the planet around its
     // original center, then place its vertices at the calculated scene center.
     for (Vertex& vertex : adrian.vertices) {
-        vertex.x = static_cast<GLfloat>(placed.x + (vertex.x - adrian_data::centerX) * adrianScale);
-        vertex.y = static_cast<GLfloat>(placed.y + (vertex.y - adrian_data::centerY) * adrianScale);
-        vertex.z = static_cast<GLfloat>(placed.z + (vertex.z - adrian_data::centerZ) * adrianScale);
+        vertex.x = static_cast<GLfloat>(placed.x + (vertex.x - adrian_data::centerX) * 1.2);
+        vertex.y = static_cast<GLfloat>(placed.y + (vertex.y - adrian_data::centerY) * 1.2);
+        vertex.z = static_cast<GLfloat>(placed.z + (vertex.z - adrian_data::centerZ) * 1.2);
     }
 
     std::cout << "Embedded scene: " << model.indices.size() / 3 << " model triangles and "
@@ -330,14 +327,21 @@ void initializeParticles()
     // Nearby projected particles share similar screen positions along the path.
     const auto cell = [](const Particle& p)
 {
-    const int x = std::clamp(static_cast<int>((p.position.x + 2.45) * 32.0 / 4.90), 0, 31);
-        const int y = std::clamp(static_cast<int>((p.position.y + 2.45) * 32.0 / 4.90), 0, 31);
+        int x = static_cast<int>((p.position.x + 2.45) * 32.0 / 4.90);
+        int y = static_cast<int>((p.position.y + 2.45) * 32.0 / 4.90);
+        if (x < 0) x = 0;
+        if (x > 31) x = 31;
+        if (y < 0) y = 0;
+        if (y > 31) y = 31;
         return y * 32 + x;
     };
     int neighbors[32 * 32] = {};
     for (const Particle& particle : particles) ++neighbors[cell(particle)];
-    for (Particle& particle : particles)
-        particle.crowding = std::clamp((neighbors[cell(particle)] - 12) / 50.0f, 0.0f, 1.0f);
+    for (Particle& particle : particles) {
+        particle.crowding = (neighbors[cell(particle)] - 12) / 50.0f;
+        if (particle.crowding < 0.0f) particle.crowding = 0.0f;
+        if (particle.crowding > 1.0f) particle.crowding = 1.0f;
+    }
 }
 
 // Transform a particle from field coordinates into the animated 3D scene.
@@ -382,7 +386,9 @@ void drawParticles()
     if (orbitingAdrian || !pathReady || pathPosition <= 0.40) return;
 
     const double density = std::min(1.0, (pathPosition - 0.40) / 0.60);
-    const double endFade = std::clamp((pathPosition - 0.75) / 0.25, 0.0, 1.0);
+    double endFade = (pathPosition - 0.75) / 0.25;
+    if (endFade < 0.0) endFade = 0.0;
+    if (endFade > 1.0) endFade = 1.0;
 
     const Vec3 viewForward = forwardDirection();
     const Vec3 viewRight{std::cos(cameraYaw), 0.0, std::sin(cameraYaw)};
@@ -406,7 +412,9 @@ void drawParticles()
         const double depth = offset.x * viewForward.x + offset.y * viewForward.y + offset.z * viewForward.z;
         if (depth <= 0.055) continue;
 
-        const double farFade = std::clamp((depth - 1.2) / 2.5, 0.0, 1.0);
+        double farFade = (depth - 1.2) / 2.5;
+        if (farFade < 0.0) farFade = 0.0;
+        if (farFade > 1.0) farFade = 1.0;
         const double visibility = 1.0 - 0.90 * endFade * farFade;
         if (particle.threshold > density * visibility) continue;
 
@@ -573,8 +581,12 @@ void drawHud()
 // composite the particle field and 2D HUD, then swap the back buffer.
 void display()
 {
-    const float redMix = static_cast<float>(std::clamp((pathPosition - 0.40) / 0.07, 0.0, 1.0));
-    const float spawn = static_cast<float>(std::clamp((pathPosition - 0.40) / 0.60, 0.0, 1.0));
+    float redMix = static_cast<float>((pathPosition - 0.40) / 0.07);
+    if (redMix < 0.0f) redMix = 0.0f;
+    if (redMix > 1.0f) redMix = 1.0f;
+    float spawn = static_cast<float>((pathPosition - 0.40) / 0.60);
+    if (spawn < 0.0f) spawn = 0.0f;
+    if (spawn > 1.0f) spawn = 1.0f;
     const float particleAmount = 0.60f * spawn + 0.40f * std::max(0.0f, 2.0f * spawn - 1.0f);
 
     glClearColor(0.003f + 0.087f * redMix, 0.005f + 0.007f * redMix, 0.012f + 0.020f * redMix, 1.0f);
