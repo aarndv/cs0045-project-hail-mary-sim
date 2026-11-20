@@ -2,4 +2,5 @@
 /misc/
 /main
 /phm-scene
+/phm-scene.exe
 *.o

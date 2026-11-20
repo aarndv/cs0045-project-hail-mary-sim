@@ -6,14 +6,37 @@ This scene focuses on the Petrova Line above Adrian. Ryland Grace and his compan
 
 ## Build and run
 
-Requires a C++17 compiler plus the FreeGLUT, GLEW, OpenGL, and GLU development libraries.
+### Windows (recommended)
+
+Use [MSYS2](https://www.msys2.org/) with its **UCRT64** environment. In the **MSYS2 UCRT64** terminal, install the compiler, debugger, and graphics libraries:
 
 ```sh
-g++ -g -std=c++17 main.cpp -o phm-scene -lglut -lGL -lGLU -lGLEW
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-gdb mingw-w64-ucrt-x86_64-freeglut mingw-w64-ucrt-x86_64-glew
+```
+
+Then open the repository folder in VS Code. The checked-in tasks use `C:\\msys64\\ucrt64\\bin` by default. Use **Build scene** (Ctrl+Shift+B), **Run scene** from Tasks, or **Build and Debug Scene** (F5). If MSYS2 is installed elsewhere, update the paths in `.vscode/tasks.json`, `.vscode/launch.json`, and `.vscode/c_cpp_properties.json`.
+
+To build and run directly from the UCRT64 terminal:
+
+```sh
+g++ -g -std=c++17 -Wall -Wextra main.cpp -o phm-scene.exe -lfreeglut -lopengl32 -lglu32 -lglew32
+./phm-scene.exe
+```
+
+### Linux
+
+Requires a C++17 compiler plus FreeGLUT, GLEW, OpenGL, and GLU development libraries. On Debian or Ubuntu, install them with:
+
+```sh
+sudo apt install g++ freeglut3-dev libglew-dev libglu1-mesa-dev
+```
+
+```sh
+g++ -g -std=c++17 -Wall -Wextra main.cpp -o phm-scene -lglut -lGL -lGLU -lGLEW
 ./phm-scene
 ```
 
-Open this repository folder in VS Code to use **Build scene** (Ctrl+Shift+B), **Run scene** from Tasks, or **Build and Debug Scene** (F5). The build task uses the same single-file `g++` command.
+The VS Code build and debug tasks also retain Linux settings for users building there.
 
 ## Controls
 

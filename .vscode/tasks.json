@@ -21,6 +21,22 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             },
+            "windows": {
+                "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
+                "args": [
+                    "-g",
+                    "-std=c++17",
+                    "-Wall",
+                    "-Wextra",
+                    "main.cpp",
+                    "-o",
+                    "phm-scene.exe",
+                    "-lfreeglut",
+                    "-lopengl32",
+                    "-lglu32",
+                    "-lglew32"
+                ]
+            },
             "problemMatcher": [
                 "$gcc"
             ],
@@ -37,6 +53,15 @@
             "dependsOn": "Build scene",
             "options": {
                 "cwd": "${workspaceFolder}"
+            },
+            "windows": {
+                "command": ".\\phm-scene.exe",
+                "options": {
+                    "cwd": "${workspaceFolder}",
+                    "env": {
+                        "PATH": "C:\\msys64\\ucrt64\\bin;${env:PATH}"
+                    }
+                }
             },
             "problemMatcher": []
         }

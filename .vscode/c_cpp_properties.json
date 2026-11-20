@@ -1,6 +1,18 @@
 {
     "configurations": [
         {
+            "name": "Windows MSYS2 UCRT64",
+            "compilerPath": "C:/msys64/ucrt64/bin/g++.exe",
+            "includePath": [
+                "${workspaceFolder}",
+                "C:/msys64/ucrt64/include",
+                "C:/msys64/ucrt64/include/GL"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        },
+        {
             "name": "Linux GCC",
             "compilerPath": "/usr/bin/g++",
             "includePath": [

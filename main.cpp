@@ -183,7 +183,7 @@ void startAnimation()
 // Place the enlarged planet relative to the ship and lower it slightly.
 Vec3 adrianSceneCenter()
 {
-    const Vec3 original(adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ);
+    const Vec3 original{adrian_data::centerX, adrian_data::centerY, adrian_data::centerZ};
     const Vec3 fromShip{original.x, original.y, original.z - adrian_data::modelZOffset};
     const double distance = std::sqrt(fromShip.x * fromShip.x + fromShip.y * fromShip.y + fromShip.z * fromShip.z);
     const double shift = (1.2 - 1.0) * adrian_data::radius / distance;
