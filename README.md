@@ -2,6 +2,8 @@
 
 An interactive FreeGLUT/OpenGL recreation inspired by *Project Hail Mary*. In Andy Weir's story, science teacher Ryland Grace wakes aboard a spacecraft far from Earth and must find why stars are losing energy. His investigation leads to Astrophage, a microscopic organism that feeds on stellar energy. [Sony Pictures' synopsis](https://www.sonypictures.co.uk/movies/project-hail-mary) describes Grace's mission and the mystery he must solve; the [publisher's description](https://www.penguin.co.uk/books/440237/project-hail-mary-by-weir-andy/9781807840020) frames it as a last-chance mission to save Earth.
 
+<img width="805" height="784" alt="image" src="https://github.com/user-attachments/assets/c7dceb8f-d89d-469f-b864-5ea2db4b79b2" />
+
 This scene focuses on the Petrova Line above Adrian. Ryland Grace and his companion Rocky collect crimson Astrophage and discover microbial life in Adrian's atmosphere. That discovery may offer a way to protect both of their suns. The recreation includes the ship, Adrian, 250 generated background stars, animated particles, a camera tour, and a mouse-controlled orbit view.
 
 ## Build and run
