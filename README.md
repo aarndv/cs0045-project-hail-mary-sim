@@ -66,6 +66,3 @@ The VS Code build and debug tasks also retain Linux settings for users building 
 - `assets/textures/`: Adrian's texture maps.
 
 The program resolves `assets/` relative to the executable, so it can be launched from any working directory while the repository layout stays intact.
-
-For a feature and controls summary, see [Code and Controls Overview](docs/code-overview.md).
-For the five-person walkthrough, see [Video Presentation Script](docs/video-presentation-script.md).
