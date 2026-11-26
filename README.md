@@ -6,6 +6,16 @@ This scene focuses on the Petrova Line above Adrian. Ryland Grace and his compan
 
 ## Build and run
 
+### Run the prebuilt Windows executable
+
+For a quick launch without installing a compiler, download the repository from the **main** branch as a ZIP and extract the folder. Open the extracted folder and run `phm-scene.exe` by double-clicking it, or from PowerShell with:
+
+```powershell
+.\phm-scene.exe
+```
+
+This build is for 64-bit Windows and includes the FreeGLUT, GLEW, and C++ runtime code it needs. Keep the `assets` folder beside the executable; it contains Adrian's textures. A Windows graphics driver with OpenGL support is required. The executable is built from `main.cpp` and can be rebuilt using the steps below.
+
 ### Windows (recommended)
 
 Use [MSYS2](https://www.msys2.org/) with its **UCRT64** environment. In the **MSYS2 UCRT64** terminal, install the compiler, debugger, and graphics libraries:
